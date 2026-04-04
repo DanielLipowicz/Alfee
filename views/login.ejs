@@ -2,29 +2,23 @@
 
 <section class="card narrow">
   <h1>Logowanie</h1>
-  <p>Zaloguj sie lokalnie po nazwie uzytkownika i emailu.</p>
+  <p>Zaloguj sie po nazwie uzytkownika lub emailu i hasle.</p>
 
   <form class="form-stack" method="POST" action="/login/local">
     <label>
-      Nazwa uzytkownika
+      Nazwa uzytkownika lub email
       <input
         type="text"
-        name="username"
-        value="<%= formData?.username || '' %>"
+        name="identifier"
+        value="<%= formData?.identifier || '' %>"
         required
         autocomplete="username"
       />
     </label>
 
     <label>
-      Email
-      <input
-        type="email"
-        name="email"
-        value="<%= formData?.email || '' %>"
-        required
-        autocomplete="email"
-      />
+      Haslo
+      <input type="password" name="password" required autocomplete="current-password" />
     </label>
 
     <button class="btn btn--primary" type="submit">Zaloguj</button>

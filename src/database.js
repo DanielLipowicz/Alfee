@@ -121,6 +121,9 @@ async function initDatabase() {
       email TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       auth_provider TEXT NOT NULL DEFAULT 'google',
+      password_hash TEXT,
+      failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       role TEXT NOT NULL DEFAULT 'employee',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -143,7 +146,24 @@ async function initDatabase() {
     );
   }
 
+  if (!(await tableHasColumn("users", "password_hash"))) {
+    await db.run("ALTER TABLE users ADD COLUMN password_hash TEXT");
+  }
+
+  if (!(await tableHasColumn("users", "failed_login_attempts"))) {
+    await db.run(
+      "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0"
+    );
+  }
+
+  if (!(await tableHasColumn("users", "locked_until"))) {
+    await db.run("ALTER TABLE users ADD COLUMN locked_until TEXT");
+  }
+
   await db.run("UPDATE users SET is_active = 1 WHERE is_active IS NULL");
+  await db.run(
+    "UPDATE users SET failed_login_attempts = 0 WHERE failed_login_attempts IS NULL"
+  );
 
   await db.run(`
     CREATE TABLE IF NOT EXISTS organizations (

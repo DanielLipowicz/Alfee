@@ -15,11 +15,14 @@ const employeeRoutes = require("./src/routes/employeeRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const { ensureAuthenticated } = require("./src/middleware/auth");
 const { loadUserOrganizations } = require("./src/middleware/tenant");
+const { hashPassword, verifyPassword } = require("./src/security/password");
 const { setFlash } = require("./src/utils/flash");
 
 const app = express();
 const SQLiteStore = SQLiteStoreFactory(session);
 const PORT = Number(process.env.PORT) || 3000;
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
 
 function parseBooleanEnv(value) {
   if (value == null || value === "") {
@@ -106,8 +109,12 @@ function normalizeEmail(rawEmail) {
   return String(rawEmail || "").trim().toLowerCase();
 }
 
+function normalizeText(rawValue) {
+  return String(rawValue || "").trim();
+}
+
 function normalizeUsername(rawUsername) {
-  return String(rawUsername || "").trim();
+  return normalizeText(rawUsername);
 }
 
 function validateEmail(email) {
@@ -116,6 +123,26 @@ function validateEmail(email) {
 
 function validateUsername(username) {
   return /^[a-zA-Z0-9._-]{3,40}$/.test(username);
+}
+
+function validatePasswordStrength(password) {
+  const value = String(password || "");
+  if (value.length < 10) {
+    return "Haslo musi miec co najmniej 10 znakow.";
+  }
+  if (!/[a-z]/.test(value)) {
+    return "Haslo musi zawierac mala litere.";
+  }
+  if (!/[A-Z]/.test(value)) {
+    return "Haslo musi zawierac wielka litere.";
+  }
+  if (!/[0-9]/.test(value)) {
+    return "Haslo musi zawierac cyfre.";
+  }
+  if (!/[^a-zA-Z0-9]/.test(value)) {
+    return "Haslo musi zawierac znak specjalny.";
+  }
+  return null;
 }
 
 function buildLocalIdentity(username) {
@@ -149,6 +176,46 @@ async function determineRoleForNewUser(email) {
     return "manager";
   }
   return "employee";
+}
+
+async function registerFailedLoginAttempt(userId) {
+  await db.run(
+    `
+    UPDATE users
+    SET
+      failed_login_attempts = failed_login_attempts + 1,
+      locked_until = CASE
+        WHEN failed_login_attempts + 1 >= ? THEN datetime('now', ?)
+        ELSE locked_until
+      END
+    WHERE id = ?
+    `,
+    [MAX_LOGIN_ATTEMPTS, `+${LOCKOUT_MINUTES} minutes`, userId]
+  );
+
+  return db.get(
+    "SELECT failed_login_attempts, locked_until FROM users WHERE id = ?",
+    [userId]
+  );
+}
+
+async function clearFailedLoginAttempts(userId) {
+  await db.run(
+    "UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?",
+    [userId]
+  );
+}
+
+function isLocked(lockedUntil) {
+  if (!lockedUntil) {
+    return false;
+  }
+  const normalized = String(lockedUntil).replace(" ", "T");
+  const lockTimestamp = Date.parse(`${normalized}Z`);
+  if (Number.isNaN(lockTimestamp)) {
+    return false;
+  }
+  return lockTimestamp > Date.now();
 }
 
 async function ensureDefaultMembership(userId, role) {
@@ -268,7 +335,7 @@ if (googleConfigured) {
             await db.run(
               `
               UPDATE users
-              SET google_id = ?, email = ?, name = ?, role = ?, auth_provider = 'google'
+              SET google_id = ?, email = ?, name = ?, role = ?
               WHERE id = ?
               `,
               [googleId, email, name, targetRole, user.id]
@@ -345,35 +412,34 @@ app.get("/login", (req, res) => {
   return res.render("login", {
     title: "Logowanie",
     formData: {
-      username: "",
-      email: "",
+      identifier: "",
     },
   });
 });
 
 app.post("/login/local", async (req, res, next) => {
   try {
-    const username = normalizeUsername(req.body.username);
-    const email = normalizeEmail(req.body.email);
+    const identifier = normalizeText(req.body.identifier).toLowerCase();
+    const password = String(req.body.password || "");
 
-    if (!username || !email) {
+    if (!identifier || !password) {
       return renderAuthError(
         res,
         400,
         "login",
-        { username, email },
-        "Podaj nazwe uzytkownika i email."
+        { identifier },
+        "Podaj nazwe uzytkownika lub email oraz haslo."
       );
     }
 
-    const user = await db.get(
+    let user = await db.get(
       `
       SELECT *
       FROM users
-      WHERE lower(username) = lower(?) AND lower(email) = lower(?)
+      WHERE auth_provider = 'local' AND (lower(username) = lower(?) OR lower(email) = lower(?))
       LIMIT 1
       `,
-      [username, email]
+      [identifier, identifier]
     );
 
     if (!user) {
@@ -381,8 +447,8 @@ app.post("/login/local", async (req, res, next) => {
         res,
         401,
         "login",
-        { username, email },
-        "Nie znaleziono konta z podanymi danymi."
+        { identifier },
+        "Niepoprawne dane logowania."
       );
     }
 
@@ -391,10 +457,60 @@ app.post("/login/local", async (req, res, next) => {
         res,
         403,
         "login",
-        { username, email },
+        { identifier },
         "To konto jest nieaktywne."
       );
     }
+
+    if (isLocked(user.locked_until)) {
+      return renderAuthError(
+        res,
+        423,
+        "login",
+        { identifier },
+        `Konto jest czasowo zablokowane po wielu nieudanych probach. Sprobuj ponownie za ${LOCKOUT_MINUTES} minut.`
+      );
+    }
+
+    if (user.locked_until) {
+      await clearFailedLoginAttempts(user.id);
+      user = {
+        ...user,
+        failed_login_attempts: 0,
+        locked_until: null,
+      };
+    }
+
+    if (!user.password_hash) {
+      return renderAuthError(
+        res,
+        403,
+        "login",
+        { identifier },
+        "To konto nie ma ustawionego hasla. Zarejestruj nowe konto lokalne lub zaloguj sie przez Google."
+      );
+    }
+
+    const validPassword = verifyPassword(password, user.password_hash);
+    if (!validPassword) {
+      const updatedLoginState = await registerFailedLoginAttempt(user.id);
+      const baseMessage = "Niepoprawne dane logowania.";
+      if (
+        Number(updatedLoginState.failed_login_attempts || 0) >= MAX_LOGIN_ATTEMPTS &&
+        isLocked(updatedLoginState.locked_until)
+      ) {
+        return renderAuthError(
+          res,
+          423,
+          "login",
+          { identifier },
+          `Konto zostalo zablokowane na ${LOCKOUT_MINUTES} minut po wielu nieudanych probach.`
+        );
+      }
+      return renderAuthError(res, 401, "login", { identifier }, baseMessage);
+    }
+
+    await clearFailedLoginAttempts(user.id);
 
     return req.login(user, (error) => {
       if (error) {
@@ -418,6 +534,8 @@ app.get("/register", (req, res) => {
       username: "",
       email: "",
       name: "",
+      password: "",
+      passwordConfirm: "",
     },
   });
 });
@@ -427,13 +545,15 @@ app.post("/register", async (req, res, next) => {
     const username = normalizeUsername(req.body.username);
     const email = normalizeEmail(req.body.email);
     const name = String(req.body.name || "").trim() || username;
+    const password = String(req.body.password || "");
+    const passwordConfirm = String(req.body.passwordConfirm || "");
 
     if (!username || !email) {
       return renderAuthError(
         res,
         400,
         "register",
-        { username, email, name },
+        { username, email, name, password: "", passwordConfirm: "" },
         "Podaj nazwe uzytkownika i email."
       );
     }
@@ -443,7 +563,7 @@ app.post("/register", async (req, res, next) => {
         res,
         400,
         "register",
-        { username, email, name },
+        { username, email, name, password: "", passwordConfirm: "" },
         "Nazwa uzytkownika musi miec 3-40 znakow: litery, cyfry, kropka, myslnik lub podkreslenie."
       );
     }
@@ -453,8 +573,29 @@ app.post("/register", async (req, res, next) => {
         res,
         400,
         "register",
-        { username, email, name },
+        { username, email, name, password: "", passwordConfirm: "" },
         "Podaj poprawny adres email."
+      );
+    }
+
+    const passwordError = validatePasswordStrength(password);
+    if (passwordError) {
+      return renderAuthError(
+        res,
+        400,
+        "register",
+        { username, email, name, password: "", passwordConfirm: "" },
+        passwordError
+      );
+    }
+
+    if (password !== passwordConfirm) {
+      return renderAuthError(
+        res,
+        400,
+        "register",
+        { username, email, name, password: "", passwordConfirm: "" },
+        "Hasla musza byc identyczne."
       );
     }
 
@@ -468,7 +609,7 @@ app.post("/register", async (req, res, next) => {
         res,
         409,
         "register",
-        { username, email, name },
+        { username, email, name, password: "", passwordConfirm: "" },
         "Ta nazwa uzytkownika jest juz zajeta."
       );
     }
@@ -478,20 +619,21 @@ app.post("/register", async (req, res, next) => {
         res,
         409,
         "register",
-        { username, email, name },
+        { username, email, name, password: "", passwordConfirm: "" },
         "Ten email jest juz zarejestrowany."
       );
     }
 
     const role = await determineRoleForNewUser(email);
     const localIdentity = buildLocalIdentity(username);
+    const passwordHash = hashPassword(password);
 
     const created = await db.run(
       `
-      INSERT INTO users (google_id, username, email, name, auth_provider, is_active, role)
-      VALUES (?, ?, ?, ?, 'local', 1, ?)
+      INSERT INTO users (google_id, username, email, name, auth_provider, password_hash, is_active, role)
+      VALUES (?, ?, ?, ?, 'local', ?, 1, ?)
       `,
-      [localIdentity, username, email, name, role]
+      [localIdentity, username, email, name, passwordHash, role]
     );
 
     const user = await db.get("SELECT * FROM users WHERE id = ?", [created.lastID]);

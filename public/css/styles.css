@@ -275,6 +275,7 @@ button {
 
 input[type="text"],
 input[type="email"],
+input[type="password"],
 select {
   border: 1px solid var(--border);
   border-radius: 8px;
