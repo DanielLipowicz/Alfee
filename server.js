@@ -202,11 +202,9 @@ if (googleConfigured) {
 
             if (shouldBeAdmin) {
               targetRole = "admin";
-            } else if (user.role === "admin") {
-              targetRole = shouldBeManager ? "manager" : "employee";
-            } else if (shouldBeManager || user.role === "manager") {
+            } else if (shouldBeManager) {
               targetRole = "manager";
-            } else {
+            } else if (!["admin", "manager", "employee"].includes(user.role)) {
               targetRole = "employee";
             }
 

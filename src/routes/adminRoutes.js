@@ -18,7 +18,7 @@ async function rollbackSafely() {
 
 router.get("/organizations", async (_req, res, next) => {
   try {
-    const [organizations, users, members] = await Promise.all([
+    const [organizations, users, allUsers, members] = await Promise.all([
       db.all(
         `
         SELECT
@@ -40,6 +40,19 @@ router.get("/organizations", async (_req, res, next) => {
         FROM users
         WHERE role IN ('manager', 'employee')
         ORDER BY role ASC, name ASC
+        `
+      ),
+      db.all(
+        `
+        SELECT id, name, email, role
+        FROM users
+        ORDER BY
+          CASE role
+            WHEN 'admin' THEN 1
+            WHEN 'manager' THEN 2
+            ELSE 3
+          END,
+          name ASC
         `
       ),
       db.all(
@@ -70,6 +83,7 @@ router.get("/organizations", async (_req, res, next) => {
       title: "Organizacje",
       organizations,
       users,
+      allUsers,
       membersByOrganization,
     });
   } catch (error) {
@@ -144,6 +158,52 @@ router.delete("/organizations/:organizationId", async (req, res, next) => {
     return res.redirect("/admin/organizations");
   } catch (error) {
     await rollbackSafely();
+    return next(error);
+  }
+});
+
+router.put("/users/:userId/role", async (req, res, next) => {
+  const userId = Number(req.params.userId);
+  const targetRole = String(req.body.role || "").trim();
+  const allowedRoles = ["admin", "manager", "employee"];
+
+  if (!userId || !allowedRoles.includes(targetRole)) {
+    setFlash(req, "error", "Niepoprawna rola lub uzytkownik.");
+    return res.redirect("/admin/organizations");
+  }
+
+  try {
+    const user = await db.get("SELECT id, name, role FROM users WHERE id = ?", [
+      userId,
+    ]);
+    if (!user) {
+      setFlash(req, "error", "Nie znaleziono uzytkownika.");
+      return res.redirect("/admin/organizations");
+    }
+
+    if (Number(req.user.id) === Number(user.id) && targetRole !== "admin") {
+      setFlash(
+        req,
+        "error",
+        "Nie mozesz odebrac sobie roli administratora z tego panelu."
+      );
+      return res.redirect("/admin/organizations");
+    }
+
+    if (user.role === "admin" && targetRole !== "admin") {
+      const adminCount = await db.get(
+        "SELECT COUNT(*) AS total FROM users WHERE role = 'admin'"
+      );
+      if (Number(adminCount.total || 0) <= 1) {
+        setFlash(req, "error", "Nie mozna zdegradowac ostatniego administratora.");
+        return res.redirect("/admin/organizations");
+      }
+    }
+
+    await db.run("UPDATE users SET role = ? WHERE id = ?", [targetRole, user.id]);
+    setFlash(req, "success", `Zmieniono role dla ${user.name}.`);
+    return res.redirect("/admin/organizations");
+  } catch (error) {
     return next(error);
   }
 });

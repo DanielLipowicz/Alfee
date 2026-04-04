@@ -4,6 +4,8 @@ Aplikacja webowa z trzema rolami:
 
 - `admin`:
   - tworzy organizacje,
+  - edytuje i usuwa organizacje,
+  - zarzadza rolami uzytkownikow (admin/kierownik/pracownik),
   - przypisuje kierownikow i pracownikow do organizacji,
   - zarzadza czlonkostwami w tenantach.
 - `manager`:
@@ -61,9 +63,10 @@ npm start
 
 ## Role uzytkownikow
 
-- `ADMIN_EMAILS`: konta z tej listy dostaja role `admin`.
-- `MANAGER_EMAILS`: konta z tej listy dostaja role `manager`.
-- Pozostali uzytkownicy dostaja role `employee`.
+- `ADMIN_EMAILS`: konta z tej listy sa promowane do roli `admin` przy logowaniu.
+- `MANAGER_EMAILS`: konta z tej listy sa promowane do roli `manager` przy logowaniu.
+- Administrator moze recznie zmieniac role uzytkownikow z panelu.
+- Pozostali uzytkownicy domyslnie dostaja role `employee`.
 - Jesli obie listy sa puste, pierwszy zalogowany uzytkownik zostaje kierownikiem (fallback developerski).
 
 ## Tenanty

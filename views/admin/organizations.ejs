@@ -56,6 +56,43 @@
 </section>
 
 <section class="card">
+  <h2>Role uzytkownikow</h2>
+  <% if (!allUsers || allUsers.length === 0) { %>
+  <p>Brak uzytkownikow.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Uzytkownik</th>
+        <th>Aktualna rola</th>
+        <th>Zmien role</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% allUsers.forEach((user) => { %>
+      <tr>
+        <td><%= user.name %> <span class="muted">(<%= user.email %>)</span></td>
+        <td>
+          <%= user.role === "admin" ? "administrator" : user.role === "manager" ? "kierownik" : "pracownik" %>
+        </td>
+        <td>
+          <form class="form-inline" method="POST" action="/admin/users/<%= user.id %>/role?_method=PUT">
+            <select name="role" required>
+              <option value="employee" <%= user.role === "employee" ? "selected" : "" %>>pracownik</option>
+              <option value="manager" <%= user.role === "manager" ? "selected" : "" %>>kierownik</option>
+              <option value="admin" <%= user.role === "admin" ? "selected" : "" %>>administrator</option>
+            </select>
+            <button class="btn" type="submit">Zapisz</button>
+          </form>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<section class="card">
   <h2>Lista organizacji</h2>
 
   <% if (organizations.length === 0) { %>
