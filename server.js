@@ -21,6 +21,63 @@ const app = express();
 const SQLiteStore = SQLiteStoreFactory(session);
 const PORT = Number(process.env.PORT) || 3000;
 
+function parseBooleanEnv(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return null;
+}
+
+function parseTrustProxyValue(value) {
+  if (value == null || value === "") {
+    return false;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return 1;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  const asNumber = Number(normalized);
+  if (Number.isInteger(asNumber) && asNumber >= 0) {
+    return asNumber;
+  }
+  return value;
+}
+
+const trustProxy = parseTrustProxyValue(process.env.TRUST_PROXY);
+const sessionCookieSecureEnv = String(
+  process.env.SESSION_COOKIE_SECURE || "auto"
+).trim().toLowerCase();
+const sessionCookieSecure =
+  sessionCookieSecureEnv === "auto"
+    ? "auto"
+    : parseBooleanEnv(sessionCookieSecureEnv) ?? false;
+const forceHttps = parseBooleanEnv(process.env.FORCE_HTTPS) === true;
+
+app.set("trust proxy", trustProxy);
+
+if (forceHttps) {
+  app.use((req, res, next) => {
+    if (req.secure) {
+      return next();
+    }
+    const host = req.headers.host;
+    if (!host) {
+      return next();
+    }
+    return res.redirect(301, `https://${host}${req.originalUrl}`);
+  });
+}
+
 const uploadsDir = path.join(process.cwd(), "uploads");
 const dataDir = path.join(process.cwd(), "data");
 
@@ -133,7 +190,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: sessionCookieSecure,
       maxAge: 1000 * 60 * 60 * 24 * 7,
     },
   })

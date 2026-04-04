@@ -94,6 +94,52 @@ npm start
 - Za reverse proxy/HTTPS ustaw `secure` cookie i `trust proxy`.
 - Rozwaz przeniesienie uploadow do obiektu storage (S3/GCS) i dodanie limitow/antywirusa.
 
+## ERR_SSL_PROTOCOL_ERROR na telefonach (naprawa)
+
+Ten projekt nasluchuje HTTP (`node server.js`), wiec blad `ERR_SSL_PROTOCOL_ERROR` zwykle oznacza, ze klient laczy sie po `https` do portu bez TLS (np. `:20120`) albo serwer TLS wysyla niepelny lancuch certyfikatow.
+
+Szybkie rozwiazanie:
+
+1. Wystaw HTTPS na `:443` przez reverse proxy (Caddy/Nginx) i proxy do `http://127.0.0.1:20120`.
+2. Ustaw pelny lancuch certyfikatu (`fullchain.pem`, nie samo `cert.pem`).
+3. W `.env` ustaw:
+
+```env
+TRUST_PROXY=1
+SESSION_COOKIE_SECURE=auto
+FORCE_HTTPS=true
+GOOGLE_CALLBACK_URL=https://twoja-domena/auth/google/callback
+```
+
+Przyklad Caddy (najprostszy):
+
+```caddy
+twoja-domena.pl {
+  reverse_proxy 127.0.0.1:20120
+}
+```
+
+Przyklad Nginx (TLS + pelny lancuch):
+
+```nginx
+server {
+  listen 443 ssl http2;
+  server_name twoja-domena.pl;
+
+  ssl_certificate /etc/letsencrypt/live/twoja-domena.pl/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/twoja-domena.pl/privkey.pem;
+
+  location / {
+    proxy_pass http://127.0.0.1:20120;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+Jesli nadal problem wystepuje tylko na mobile, najpierw sprawdz czy nie otwierasz `https://...:20120` zamiast domeny na `443`.
+
 ## License and Copyright
 
 This software is provided "AS IS" and you use it at your own risk.
@@ -105,7 +151,8 @@ The full license terms are available in `LICENSE.md`.
 ## Deploy "as code" na VPS Linux (ultra low RAM, bez Dockera)
 
 Docelowy adres aplikacji:
-- `http://frog01.mikr.us:20120/`
+- aplikacja backend: `http://127.0.0.1:20120` (wewnetrznie),
+- publicznie: `https://twoja-domena/` przez reverse proxy na `443`.
 - port `20120` jest wymuszony w skryptach deploy.
 
 ### Alpine Linux (OpenRC) - rekomendowane dla Twojego VPS
@@ -130,7 +177,7 @@ Minimum:
 ```env
 PORT=20120
 SESSION_SECRET=tu-bardzo-mocny-losowy-sekret
-GOOGLE_CALLBACK_URL=http://frog01.mikr.us:20120/auth/google/callback
+GOOGLE_CALLBACK_URL=https://twoja-domena/auth/google/callback
 ```
 
 Jesli nie uzywasz Google OAuth, pozostaw `GOOGLE_CLIENT_ID` i `GOOGLE_CLIENT_SECRET` puste.
