@@ -18,24 +18,29 @@ as_root() {
 cd "${APP_DIR}"
 OLD_HEAD="$(git rev-parse HEAD)"
 
-echo "[1/4] Pulling latest code..."
+echo "[1/5] Pulling latest code..."
 git pull --ff-only
 NEW_HEAD="$(git rev-parse HEAD)"
 
-echo "[2/4] Checking if dependency reinstall is required..."
+echo "[2/5] Checking if dependency reinstall is required..."
 if git diff --name-only "${OLD_HEAD}" "${NEW_HEAD}" | grep -Eq '(^|/)package(-lock)?\.json$'; then
   echo "package files changed, running npm ci..."
-  npm_config_jobs=1 npm_config_build_from_source=true NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
-  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
+  npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
 else
-  echo "package files unchanged, rebuilding sqlite3 for current Alpine toolchain..."
-  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
+  echo "package files unchanged, skipping npm ci."
 fi
 
-echo "[3/4] Ensuring runtime directories..."
+echo "[3/5] Ensuring runtime directories..."
 mkdir -p data uploads
 
-echo "[4/4] Restarting service..."
+echo "[4/5] Verifying runtime dependencies..."
+if ! node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"; then
+  echo "Default sqlite3 binary failed. Trying compatible prebuilt sqlite3@5.1.7..."
+  npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
+  node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"
+fi
+
+echo "[5/5] Restarting service..."
 as_root rc-service "${SERVICE_NAME}" restart
 
 echo "Done."

@@ -32,7 +32,7 @@ as_root() {
   fi
 }
 
-echo "[1/7] Installing system dependencies..."
+echo "[1/8] Installing system dependencies..."
 as_root apk add --no-cache ca-certificates curl git nodejs npm python3 build-base libstdc++ linux-headers
 
 if ! command -v node >/dev/null 2>&1; then
@@ -40,27 +40,33 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "[2/7] Verifying Node version..."
+echo "[2/8] Verifying Node version..."
 NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
 if [ "${NODE_MAJOR}" -lt 18 ]; then
   echo "ERROR: Node >= 18 is required. Installed: $(node -v)"
   exit 1
 fi
 
-echo "[3/7] Installing app dependencies (production only)..."
+echo "[3/8] Installing app dependencies (production only)..."
 cd "${APP_DIR}"
-npm_config_jobs=1 npm_config_build_from_source=true NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
-npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
+npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
 
-echo "[4/7] Creating runtime directories..."
+echo "[4/8] Creating runtime directories..."
 mkdir -p data uploads
 
 if [ ! -f "${APP_DIR}/.env" ]; then
-  echo "[5/7] Creating .env from example..."
+  echo "[5/8] Creating .env from example..."
   cp .env.example .env
 fi
 
-echo "[6/7] Writing OpenRC service..."
+echo "[6/8] Verifying installed modules..."
+if ! node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"; then
+  echo "Default sqlite3 binary failed. Trying compatible prebuilt sqlite3@5.1.7..."
+  npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
+  node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"
+fi
+
+echo "[7/8] Writing OpenRC service..."
 as_root sh -c "cat > '${INITD_FILE}'" <<EOF
 #!/sbin/openrc-run
 name="Alfee app"
@@ -102,7 +108,7 @@ EOF
 
 as_root chmod +x "${INITD_FILE}"
 
-echo "[7/7] Writing OpenRC config and starting service..."
+echo "[8/8] Writing OpenRC config and starting service..."
 as_root sh -c "cat > '${CONF_FILE}'" <<EOF
 # Alfee OpenRC runtime config
 NODE_ENV=production

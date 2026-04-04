@@ -158,10 +158,12 @@ Jesli pojawi sie blad ladowania `node_sqlite3.node`, wykonaj:
 
 ```bash
 cd /home/frog/Alfee
+rc-service alfee stop || true
 rm -rf node_modules
-apk add --no-cache python3 build-base libstdc++ linux-headers
-npm_config_jobs=1 npm_config_build_from_source=true NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
-npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
+npm cache clean --force
+npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
+npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
+node -e "require('express'); require('sqlite3'); console.log('OK')"
 rc-service alfee restart
 tail -n 100 /var/log/alfee.err
 ```
