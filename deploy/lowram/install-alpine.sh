@@ -62,39 +62,39 @@ fi
 echo "[6/7] Writing OpenRC service..."
 as_root sh -c "cat > '${INITD_FILE}'" <<EOF
 #!/sbin/openrc-run
-name=\"Alfee app\"
-description=\"Alfee Node.js app (low RAM mode)\"
+name="Alfee app"
+description="Alfee Node.js app (low RAM mode)"
 
-command=\"/usr/bin/node\"
-command_args=\"${APP_DIR}/server.js\"
-command_user=\"root\"
-directory=\"${APP_DIR}\"
-pidfile=\"/run/\${RC_SVCNAME}.pid\"
-command_background=\"yes\"
-output_log=\"/var/log/alfee.log\"
-error_log=\"/var/log/alfee.err\"
+command="/usr/bin/node"
+command_args="${APP_DIR}/server.js"
+command_user="root"
+directory="${APP_DIR}"
+pidfile="/run/\${RC_SVCNAME}.pid"
+command_background="yes"
+output_log="/var/log/alfee.log"
+error_log="/var/log/alfee.err"
 
 depend() {
   need net
 }
 
 start_pre() {
-  if [ -f \"${CONF_FILE}\" ]; then
-    . \"${CONF_FILE}\"
+  if [ -f "${CONF_FILE}" ]; then
+    . "${CONF_FILE}"
   fi
-  export NODE_ENV=\"\${NODE_ENV:-production}\"
-  export PORT=\"\${PORT:-20120}\"
-  export NODE_OPTIONS=\"\${NODE_OPTIONS:---max-old-space-size=96}\"
+  export NODE_ENV="\${NODE_ENV:-production}"
+  export PORT="\${PORT:-20120}"
+  export NODE_OPTIONS="\${NODE_OPTIONS:---max-old-space-size=96}"
 
-  if [ -f \"${APP_DIR}/.env\" ]; then
+  if [ -f "${APP_DIR}/.env" ]; then
     while IFS= read -r line; do
-      case \"\$line\" in
+      case "\$line" in
         ''|\#*) continue ;;
       esac
       key=\${line%%=*}
       val=\${line#*=}
-      export \"\$key=\$val\"
-    done < \"${APP_DIR}/.env\"
+      export "\$key=\$val"
+    done < "${APP_DIR}/.env"
   fi
 }
 EOF
