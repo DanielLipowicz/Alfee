@@ -1,0 +1,46 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <div class="section-head">
+    <h1>Zadania</h1>
+    <a class="btn btn--primary" href="/manager/tasks/new">Nowe zadanie</a>
+  </div>
+
+  <% if (tasks.length === 0) { %>
+  <p>Nie utworzono jeszcze żadnego zadania.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Nazwa</th>
+        <th>Czynności</th>
+        <th>Przydziały</th>
+        <th>Akcje</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% tasks.forEach((task) => { %>
+      <tr>
+        <td><%= task.title %></td>
+        <td><%= task.step_count %></td>
+        <td><%= task.assignment_count %></td>
+        <td>
+          <div class="actions">
+            <a class="btn" href="/manager/tasks/<%= task.id %>/edit">Edytuj</a>
+            <a class="btn" href="/manager/tasks/<%= task.id %>/assign">Przydziel</a>
+            <form method="POST" action="/manager/tasks/<%= task.id %>/copy">
+              <button class="btn" type="submit">Kopiuj</button>
+            </form>
+            <form method="POST" action="/manager/tasks/<%= task.id %>?_method=DELETE">
+              <button class="btn btn--danger" type="submit">Usuń</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

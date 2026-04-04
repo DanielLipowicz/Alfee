@@ -1,0 +1,50 @@
+<%- include("partials/top", { title }) %>
+
+<section class="card narrow">
+  <h1>Rejestracja</h1>
+  <p>Konto jest aktywne od razu po utworzeniu.</p>
+
+  <form class="form-stack" method="POST" action="/register">
+    <label>
+      Nazwa uzytkownika
+      <input
+        type="text"
+        name="username"
+        value="<%= formData?.username || '' %>"
+        required
+        minlength="3"
+        maxlength="40"
+        autocomplete="username"
+      />
+    </label>
+
+    <label>
+      Email
+      <input
+        type="email"
+        name="email"
+        value="<%= formData?.email || '' %>"
+        required
+        autocomplete="email"
+      />
+    </label>
+
+    <label>
+      Imie i nazwisko (opcjonalnie)
+      <input
+        type="text"
+        name="name"
+        value="<%= formData?.name || '' %>"
+        autocomplete="name"
+      />
+    </label>
+
+    <button class="btn btn--primary" type="submit">Utworz konto</button>
+  </form>
+
+  <p class="muted auth-switch">
+    Masz juz konto? <a href="/login">Przejdz do logowania</a>
+  </p>
+</section>
+
+<%- include("partials/bottom") %>

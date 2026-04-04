@@ -1,0 +1,48 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <h1><%= assignment.title %></h1>
+  <p>
+    Pracownik: <strong><%= assignment.employee_name %></strong>
+    <span class="muted">(<%= assignment.employee_email %>)</span>
+  </p>
+  <p>
+    Status:
+    <span class="badge <%= assignment.status === 'completed' ? 'badge--done' : 'badge--progress' %>">
+      <%= assignment.status === "completed" ? "Ukończone" : "W toku" %>
+    </span>
+  </p>
+  <p>Postęp: <strong><%= progress.completed_steps %>/<%= progress.total_steps %> (<%= progress.percentage %>%)</strong></p>
+</section>
+
+<section class="card">
+  <h2>Czynności</h2>
+  <ol class="steps">
+    <% steps.forEach((step) => { %>
+    <li class="step-item">
+      <div class="step-head">
+        <strong><%= step.step_text %></strong>
+        <span class="badge <%= step.completed === 1 ? 'badge--done' : 'badge--progress' %>">
+          <%= step.completed === 1 ? "Ukończona" : "Niewykonana" %>
+        </span>
+      </div>
+
+      <% const evidence = evidenceByStep[step.id] || []; %>
+      <% if (evidence.length === 0) { %>
+      <p class="muted">Brak zdjęć dowodowych.</p>
+      <% } else { %>
+      <div class="evidence-grid">
+        <% evidence.forEach((item) => { %>
+        <figure>
+          <img src="<%= item.image_path %>" alt="Dowód wykonania" />
+          <figcaption><%= item.uploaded_at %></figcaption>
+        </figure>
+        <% }) %>
+      </div>
+      <% } %>
+    </li>
+    <% }) %>
+  </ol>
+</section>
+
+<%- include("../partials/bottom") %>

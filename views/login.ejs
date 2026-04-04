@@ -1,0 +1,51 @@
+<%- include("partials/top", { title }) %>
+
+<section class="card narrow">
+  <h1>Logowanie</h1>
+  <p>Zaloguj sie lokalnie po nazwie uzytkownika i emailu.</p>
+
+  <form class="form-stack" method="POST" action="/login/local">
+    <label>
+      Nazwa uzytkownika
+      <input
+        type="text"
+        name="username"
+        value="<%= formData?.username || '' %>"
+        required
+        autocomplete="username"
+      />
+    </label>
+
+    <label>
+      Email
+      <input
+        type="email"
+        name="email"
+        value="<%= formData?.email || '' %>"
+        required
+        autocomplete="email"
+      />
+    </label>
+
+    <button class="btn btn--primary" type="submit">Zaloguj</button>
+  </form>
+
+  <p class="muted auth-switch">
+    Nie masz konta? <a href="/register">Zarejestruj sie</a>
+  </p>
+</section>
+
+<section class="card narrow">
+  <h2>Logowanie Google</h2>
+  <% if (googleConfigured) { %>
+  <a class="btn" href="/auth/google">Kontynuuj z Google</a>
+  <% } else { %>
+  <p class="muted">
+    Logowanie Google nie jest skonfigurowane. Uzupelnij:
+    <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code> i
+    <code>GOOGLE_CALLBACK_URL</code>.
+  </p>
+  <% } %>
+</section>
+
+<%- include("partials/bottom") %>

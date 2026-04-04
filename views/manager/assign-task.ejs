@@ -1,0 +1,40 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card narrow">
+  <h1>Przydziel zadanie</h1>
+  <p>
+    Zadanie: <strong><%= task.title %></strong>
+  </p>
+
+  <% if (employees.length === 0) { %>
+  <p>
+    Brak dostępnych pracowników. Najpierw pracownik musi zalogować się do
+    systemu przez Google.
+  </p>
+  <a class="btn" href="/manager/tasks">Wróć do zadań</a>
+  <% } else { %>
+  <form class="form-stack" method="POST" action="/manager/tasks/<%= task.id %>/assign">
+    <label>
+      Wybierz pracownika
+      <select name="employeeId" required>
+        <option value="">-- wybierz --</option>
+        <% employees.forEach((employee) => { %>
+        <option value="<%= employee.id %>">
+          <%= employee.name %> (<%= employee.email %>)
+        </option>
+        <% }) %>
+      </select>
+    </label>
+    <label class="checkbox-row">
+      <input type="checkbox" name="sendNotification" checked />
+      Wyslij powiadomienie do pracownika
+    </label>
+    <div class="actions">
+      <button class="btn btn--primary" type="submit">Przydziel</button>
+      <a class="btn" href="/manager/tasks">Anuluj</a>
+    </div>
+  </form>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

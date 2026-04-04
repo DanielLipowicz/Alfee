@@ -1,0 +1,131 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <h1>Organizacje</h1>
+  <p class="muted">
+    Administrator tworzy organizacje i przypisuje do nich kierownikow oraz pracownikow.
+  </p>
+</section>
+
+<section class="grid admin-grid">
+  <article class="card">
+    <h2>Nowa organizacja</h2>
+    <form class="form-stack" method="POST" action="/admin/organizations">
+      <label>
+        Nazwa organizacji
+        <input type="text" name="name" required />
+      </label>
+      <button class="btn btn--primary" type="submit">Utworz organizacje</button>
+    </form>
+  </article>
+
+  <article class="card">
+    <h2>Dodaj czlonkostwo</h2>
+    <% if (organizations.length === 0) { %>
+    <p>Najpierw utworz organizacje.</p>
+    <% } else if (users.length === 0) { %>
+    <p>Brak uzytkownikow do przypisania.</p>
+    <% } else { %>
+    <form class="form-stack" method="POST" action="/admin/memberships">
+      <label>
+        Organizacja
+        <select name="organizationId" required>
+          <option value="">-- wybierz --</option>
+          <% organizations.forEach((organization) => { %>
+          <option value="<%= organization.id %>"><%= organization.name %></option>
+          <% }) %>
+        </select>
+      </label>
+
+      <label>
+        Uzytkownik
+        <select name="userId" required>
+          <option value="">-- wybierz --</option>
+          <% users.forEach((user) => { %>
+          <option value="<%= user.id %>">
+            <%= user.name %> (<%= user.email %>) - <%= user.role === "manager" ? "kierownik" : "pracownik" %>
+          </option>
+          <% }) %>
+        </select>
+      </label>
+
+      <button class="btn btn--primary" type="submit">Dodaj</button>
+    </form>
+    <% } %>
+  </article>
+</section>
+
+<section class="card">
+  <h2>Lista organizacji</h2>
+
+  <% if (organizations.length === 0) { %>
+  <p>Brak organizacji.</p>
+  <% } else { %>
+  <% organizations.forEach((organization) => { %>
+  <article class="tenant-card">
+    <div class="section-head">
+      <h3><%= organization.name %></h3>
+      <span class="muted">
+        <%= organization.member_count %> czlonkow, <%= organization.task_count %> zadan
+      </span>
+    </div>
+
+    <div class="actions">
+      <form class="form-inline" method="POST" action="/admin/organizations/<%= organization.id %>?_method=PUT">
+        <input
+          type="text"
+          name="name"
+          value="<%= organization.name %>"
+          required
+          aria-label="Nowa nazwa organizacji"
+        />
+        <button class="btn" type="submit">Edytuj</button>
+      </form>
+
+      <form method="POST" action="/admin/organizations/<%= organization.id %>?_method=DELETE">
+        <button
+          class="btn btn--danger"
+          type="submit"
+          onclick="return confirm('Usuniecie organizacji usunie wszystkie jej zadania i przydzialy. Kontynuowac?');"
+        >
+          Usun organizacje
+        </button>
+      </form>
+    </div>
+
+    <% const members = membersByOrganization[organization.id] || []; %>
+    <% if (members.length === 0) { %>
+    <p class="muted">Brak przypisanych uzytkownikow.</p>
+    <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Uzytkownik</th>
+          <th>Rola</th>
+          <th>Akcja</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% members.forEach((member) => { %>
+        <tr>
+          <td><%= member.user_name %> <span class="muted">(<%= member.user_email %>)</span></td>
+          <td><%= member.user_role === "manager" ? "kierownik" : "pracownik" %></td>
+          <td>
+            <form
+              method="POST"
+              action="/admin/memberships/<%= organization.id %>/<%= member.user_id %>?_method=DELETE"
+            >
+              <button class="btn btn--danger" type="submit">Usun</button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </article>
+  <% }) %>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

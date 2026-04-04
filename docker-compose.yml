@@ -1,0 +1,19 @@
+services:
+  alfee:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alfee-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=20120
+      - NODE_OPTIONS=--max-old-space-size=128
+    ports:
+      - "20120:20120"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    mem_limit: 256m

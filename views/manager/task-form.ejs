@@ -1,0 +1,70 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <h1><%= formMode === "create" ? "Nowe zadanie" : "Edycja zadania" %></h1>
+
+  <form
+    method="POST"
+    action="<%= formMode === 'create' ? '/manager/tasks' : `/manager/tasks/${task.id}?_method=PUT` %>"
+    class="form-stack"
+  >
+    <label>
+      Nazwa zadania
+      <input type="text" name="title" required value="<%= task?.title || '' %>" />
+    </label>
+
+    <div>
+      <div class="section-head">
+        <h2>Czynności do wykonania</h2>
+        <button class="btn" id="add-step" type="button">Dodaj czynność</button>
+      </div>
+
+      <div id="steps-list" class="form-stack">
+        <% taskSteps.forEach((stepText) => { %>
+        <div class="step-row">
+          <input type="text" name="steps" required value="<%= stepText %>" />
+          <button class="btn btn--danger remove-step" type="button">Usuń</button>
+        </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn--primary" type="submit">
+        <%= formMode === "create" ? "Utwórz zadanie" : "Zapisz zmiany" %>
+      </button>
+      <a class="btn" href="/manager/tasks">Anuluj</a>
+    </div>
+  </form>
+</section>
+
+<script>
+  const list = document.getElementById("steps-list");
+  const addButton = document.getElementById("add-step");
+
+  function bindRemoveActions() {
+    document.querySelectorAll(".remove-step").forEach((button) => {
+      button.onclick = () => {
+        if (list.querySelectorAll(".step-row").length <= 1) {
+          return;
+        }
+        button.closest(".step-row").remove();
+      };
+    });
+  }
+
+  addButton.onclick = () => {
+    const row = document.createElement("div");
+    row.className = "step-row";
+    row.innerHTML = `
+      <input type="text" name="steps" required />
+      <button class="btn btn--danger remove-step" type="button">Usuń</button>
+    `;
+    list.appendChild(row);
+    bindRemoveActions();
+  };
+
+  bindRemoveActions();
+</script>
+
+<%- include("../partials/bottom") %>

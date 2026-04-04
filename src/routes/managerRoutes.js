@@ -1,0 +1,581 @@
+﻿const express = require("express");
+
+const { db } = require("../database");
+const { ensureAuthenticated, ensureManager } = require("../middleware/auth");
+const { ensureManagerOrganization } = require("../middleware/tenant");
+const { setFlash } = require("../utils/flash");
+const { normalizeSteps, withProgress } = require("../utils/tasks");
+
+const router = express.Router();
+
+router.use(ensureAuthenticated, ensureManager);
+
+async function rollbackSafely() {
+  try {
+    await db.run("ROLLBACK");
+  } catch (_error) {
+    // Brak aktywnej transakcji.
+  }
+}
+
+router.post("/organization/switch", (req, res) => {
+  const organizationId = Number(req.body.organizationId);
+  const organizations = req.userOrganizations || [];
+
+  if (!organizationId) {
+    setFlash(req, "error", "Wybierz organizacje.");
+    return res.redirect("/manager/dashboard");
+  }
+
+  const allowed = organizations.some(
+    (organization) => Number(organization.id) === organizationId
+  );
+
+  if (!allowed) {
+    setFlash(req, "error", "Nie masz dostepu do tej organizacji.");
+    return res.redirect("/manager/dashboard");
+  }
+
+  req.session.activeOrganizationId = organizationId;
+  setFlash(req, "success", "Przelaczono aktywna organizacje.");
+  return res.redirect(req.get("referer") || "/manager/dashboard");
+});
+
+router.use(ensureManagerOrganization);
+
+router.get("/dashboard", async (req, res, next) => {
+  try {
+    const organizationId = req.activeOrganizationId;
+
+    const stats = await Promise.all([
+      db.get("SELECT COUNT(*) AS count FROM tasks WHERE organization_id = ?", [
+        organizationId,
+      ]),
+      db.get(
+        `
+        SELECT COUNT(*) AS count
+        FROM users u
+        JOIN user_organizations uo ON uo.user_id = u.id
+        WHERE uo.organization_id = ? AND u.role = 'employee'
+        `,
+        [organizationId]
+      ),
+      db.get(
+        `
+        SELECT COUNT(*) AS count
+        FROM assignments a
+        JOIN tasks t ON t.id = a.task_id
+        WHERE t.organization_id = ?
+        `,
+        [organizationId]
+      ),
+      db.get(
+        `
+        SELECT COUNT(*) AS count
+        FROM assignments a
+        JOIN tasks t ON t.id = a.task_id
+        WHERE t.organization_id = ? AND a.status = 'in_progress'
+        `,
+        [organizationId]
+      ),
+    ]);
+
+    const recentAssignments = await db.all(
+      `
+      SELECT
+        a.id,
+        a.status,
+        a.created_at,
+        t.title,
+        u.name AS employee_name,
+        SUM(CASE WHEN s.completed = 1 THEN 1 ELSE 0 END) AS completed_steps,
+        COUNT(s.id) AS total_steps
+      FROM assignments a
+      JOIN tasks t ON t.id = a.task_id
+      JOIN users u ON u.id = a.employee_id
+      LEFT JOIN assignment_steps s ON s.assignment_id = a.id
+      WHERE t.organization_id = ?
+      GROUP BY a.id
+      ORDER BY a.created_at DESC
+      LIMIT 10
+      `,
+      [organizationId]
+    );
+
+    return res.render("manager/dashboard", {
+      title: "Panel kierownika",
+      stats: {
+        tasks: stats[0].count,
+        employees: stats[1].count,
+        assignments: stats[2].count,
+        active: stats[3].count,
+      },
+      recentAssignments: withProgress(recentAssignments),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/tasks", async (req, res, next) => {
+  try {
+    const tasks = await db.all(
+      `
+      SELECT
+        t.id,
+        t.title,
+        t.created_at,
+        COUNT(DISTINCT ts.id) AS step_count,
+        COUNT(DISTINCT a.id) AS assignment_count
+      FROM tasks t
+      LEFT JOIN task_steps ts ON ts.task_id = t.id
+      LEFT JOIN assignments a ON a.task_id = t.id
+      WHERE t.organization_id = ?
+      GROUP BY t.id
+      ORDER BY t.created_at DESC
+      `,
+      [req.activeOrganizationId]
+    );
+
+    return res.render("manager/tasks", {
+      title: "Zadania",
+      tasks,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/tasks/new", (_req, res) => {
+  return res.render("manager/task-form", {
+    title: "Nowe zadanie",
+    formMode: "create",
+    task: null,
+    taskSteps: ["", ""],
+  });
+});
+
+router.post("/tasks", async (req, res, next) => {
+  const title = String(req.body.title || "").trim();
+  const steps = normalizeSteps(req.body.steps);
+
+  if (!title || steps.length === 0) {
+    setFlash(
+      req,
+      "error",
+      "Podaj nazwe zadania i przynajmniej jedna czynnosc do wykonania."
+    );
+    return res.redirect("/manager/tasks/new");
+  }
+
+  try {
+    await db.run("BEGIN TRANSACTION");
+    const createdTask = await db.run(
+      "INSERT INTO tasks (title, organization_id, created_by) VALUES (?, ?, ?)",
+      [title, req.activeOrganizationId, req.user.id]
+    );
+
+    for (let index = 0; index < steps.length; index += 1) {
+      await db.run(
+        "INSERT INTO task_steps (task_id, step_text, position) VALUES (?, ?, ?)",
+        [createdTask.lastID, steps[index], index + 1]
+      );
+    }
+    await db.run("COMMIT");
+    setFlash(req, "success", "Utworzono zadanie.");
+    return res.redirect("/manager/tasks");
+  } catch (error) {
+    await rollbackSafely();
+    return next(error);
+  }
+});
+
+router.get("/tasks/:taskId/edit", async (req, res, next) => {
+  try {
+    const task = await db.get(
+      "SELECT * FROM tasks WHERE id = ? AND organization_id = ?",
+      [req.params.taskId, req.activeOrganizationId]
+    );
+    if (!task) {
+      return res.status(404).render("error", {
+        title: "Brak zadania",
+        message: "Nie znaleziono wskazanego zadania.",
+      });
+    }
+
+    const taskSteps = await db.all(
+      "SELECT * FROM task_steps WHERE task_id = ? ORDER BY position",
+      [task.id]
+    );
+
+    return res.render("manager/task-form", {
+      title: "Edycja zadania",
+      formMode: "edit",
+      task,
+      taskSteps: taskSteps.map((step) => step.step_text),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put("/tasks/:taskId", async (req, res, next) => {
+  const title = String(req.body.title || "").trim();
+  const steps = normalizeSteps(req.body.steps);
+
+  if (!title || steps.length === 0) {
+    setFlash(
+      req,
+      "error",
+      "Podaj nazwe zadania i przynajmniej jedna czynnosc do wykonania."
+    );
+    return res.redirect(`/manager/tasks/${req.params.taskId}/edit`);
+  }
+
+  try {
+    const task = await db.get(
+      "SELECT id FROM tasks WHERE id = ? AND organization_id = ?",
+      [req.params.taskId, req.activeOrganizationId]
+    );
+    if (!task) {
+      return res.status(404).render("error", {
+        title: "Brak zadania",
+        message: "Nie znaleziono wskazanego zadania.",
+      });
+    }
+
+    await db.run("BEGIN TRANSACTION");
+    await db.run("UPDATE tasks SET title = ? WHERE id = ?", [title, task.id]);
+    await db.run("DELETE FROM task_steps WHERE task_id = ?", [task.id]);
+    for (let index = 0; index < steps.length; index += 1) {
+      await db.run(
+        "INSERT INTO task_steps (task_id, step_text, position) VALUES (?, ?, ?)",
+        [task.id, steps[index], index + 1]
+      );
+    }
+    await db.run("COMMIT");
+
+    setFlash(req, "success", "Zaktualizowano zadanie.");
+    return res.redirect("/manager/tasks");
+  } catch (error) {
+    await rollbackSafely();
+    return next(error);
+  }
+});
+
+router.post("/tasks/:taskId/copy", async (req, res, next) => {
+  try {
+    const task = await db.get(
+      "SELECT * FROM tasks WHERE id = ? AND organization_id = ?",
+      [req.params.taskId, req.activeOrganizationId]
+    );
+    if (!task) {
+      return res.status(404).render("error", {
+        title: "Brak zadania",
+        message: "Nie znaleziono wskazanego zadania.",
+      });
+    }
+
+    const steps = await db.all(
+      "SELECT * FROM task_steps WHERE task_id = ? ORDER BY position",
+      [task.id]
+    );
+
+    await db.run("BEGIN TRANSACTION");
+    const copied = await db.run(
+      "INSERT INTO tasks (title, organization_id, created_by) VALUES (?, ?, ?)",
+      [`${task.title} (kopia)`, req.activeOrganizationId, req.user.id]
+    );
+    for (let index = 0; index < steps.length; index += 1) {
+      await db.run(
+        "INSERT INTO task_steps (task_id, step_text, position) VALUES (?, ?, ?)",
+        [copied.lastID, steps[index].step_text, index + 1]
+      );
+    }
+    await db.run("COMMIT");
+
+    setFlash(req, "success", "Skopiowano zadanie.");
+    return res.redirect("/manager/tasks");
+  } catch (error) {
+    await rollbackSafely();
+    return next(error);
+  }
+});
+
+router.delete("/tasks/:taskId", async (req, res, next) => {
+  try {
+    const task = await db.get(
+      "SELECT id FROM tasks WHERE id = ? AND organization_id = ?",
+      [req.params.taskId, req.activeOrganizationId]
+    );
+    if (!task) {
+      setFlash(req, "error", "Nie znaleziono zadania do usuniecia.");
+      return res.redirect("/manager/tasks");
+    }
+
+    await db.run("DELETE FROM tasks WHERE id = ?", [task.id]);
+    setFlash(req, "success", "Usunieto zadanie.");
+    return res.redirect("/manager/tasks");
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/tasks/:taskId/assign", async (req, res, next) => {
+  try {
+    const [task, employees] = await Promise.all([
+      db.get("SELECT * FROM tasks WHERE id = ? AND organization_id = ?", [
+        req.params.taskId,
+        req.activeOrganizationId,
+      ]),
+      db.all(
+        `
+        SELECT
+          u.id,
+          u.name,
+          u.email
+        FROM users u
+        JOIN user_organizations uo ON uo.user_id = u.id
+        WHERE uo.organization_id = ? AND u.role = 'employee'
+        ORDER BY u.name ASC
+        `,
+        [req.activeOrganizationId]
+      ),
+    ]);
+
+    if (!task) {
+      return res.status(404).render("error", {
+        title: "Brak zadania",
+        message: "Nie znaleziono wskazanego zadania.",
+      });
+    }
+
+    return res.render("manager/assign-task", {
+      title: "Przydziel zadanie",
+      task,
+      employees,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/tasks/:taskId/assign", async (req, res, next) => {
+  const employeeId = Number(req.body.employeeId);
+  const sendNotification = req.body.sendNotification === "on";
+  if (!employeeId) {
+    setFlash(req, "error", "Wybierz pracownika.");
+    return res.redirect(`/manager/tasks/${req.params.taskId}/assign`);
+  }
+
+  try {
+    const [task, employee, steps] = await Promise.all([
+      db.get("SELECT * FROM tasks WHERE id = ? AND organization_id = ?", [
+        req.params.taskId,
+        req.activeOrganizationId,
+      ]),
+      db.get(
+        `
+        SELECT
+          u.id,
+          u.name,
+          u.email
+        FROM users u
+        JOIN user_organizations uo ON uo.user_id = u.id
+        WHERE u.id = ? AND u.role = 'employee' AND uo.organization_id = ?
+        `,
+        [employeeId, req.activeOrganizationId]
+      ),
+      db.all(
+        "SELECT * FROM task_steps WHERE task_id = ? ORDER BY position ASC",
+        [req.params.taskId]
+      ),
+    ]);
+
+    if (!task) {
+      return res.status(404).render("error", {
+        title: "Brak zadania",
+        message: "Nie znaleziono wskazanego zadania.",
+      });
+    }
+    if (!employee) {
+      setFlash(
+        req,
+        "error",
+        "Wybrany uzytkownik nie jest pracownikiem w tej organizacji."
+      );
+      return res.redirect(`/manager/tasks/${task.id}/assign`);
+    }
+    if (steps.length === 0) {
+      setFlash(req, "error", "Nie mozna przydzielic zadania bez czynnosci.");
+      return res.redirect("/manager/tasks");
+    }
+
+    await db.run("BEGIN TRANSACTION");
+    const assignment = await db.run(
+      `
+      INSERT INTO assignments (task_id, employee_id, assigned_by, status)
+      VALUES (?, ?, ?, 'in_progress')
+      `,
+      [task.id, employee.id, req.user.id]
+    );
+
+    for (let index = 0; index < steps.length; index += 1) {
+      await db.run(
+        `
+        INSERT INTO assignment_steps (assignment_id, source_step_id, step_text, position)
+        VALUES (?, ?, ?, ?)
+        `,
+        [assignment.lastID, steps[index].id, steps[index].step_text, index + 1]
+      );
+    }
+
+    if (sendNotification) {
+      await db.run(
+        `
+        INSERT INTO notifications (user_id, type, title, message, url)
+        VALUES (?, 'assignment', ?, ?, ?)
+        `,
+        [
+          employee.id,
+          "Nowe przydzielone zadanie",
+          `Otrzymales nowe zadanie: ${task.title}`,
+          `/employee/tasks/${assignment.lastID}`,
+        ]
+      );
+    }
+
+    await db.run("COMMIT");
+
+    setFlash(
+      req,
+      "success",
+      sendNotification
+        ? `Przydzielono zadanie "${task.title}" do ${employee.name} i wyslano powiadomienie.`
+        : `Przydzielono zadanie "${task.title}" do ${employee.name}.`
+    );
+    return res.redirect("/manager/assignments");
+  } catch (error) {
+    await rollbackSafely();
+    return next(error);
+  }
+});
+
+router.get("/assignments", async (req, res, next) => {
+  try {
+    const assignments = await db.all(
+      `
+      SELECT
+        a.id,
+        a.status,
+        a.created_at,
+        t.title,
+        u.name AS employee_name,
+        u.email AS employee_email,
+        SUM(CASE WHEN s.completed = 1 THEN 1 ELSE 0 END) AS completed_steps,
+        COUNT(s.id) AS total_steps
+      FROM assignments a
+      JOIN tasks t ON t.id = a.task_id
+      JOIN users u ON u.id = a.employee_id
+      LEFT JOIN assignment_steps s ON s.assignment_id = a.id
+      WHERE t.organization_id = ?
+      GROUP BY a.id
+      ORDER BY a.created_at DESC
+      `,
+      [req.activeOrganizationId]
+    );
+
+    return res.render("manager/assignments", {
+      title: "Przydzielone zadania",
+      assignments: withProgress(assignments),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/assignments/:assignmentId", async (req, res, next) => {
+  try {
+    const assignment = await db.get(
+      `
+      SELECT
+        a.*,
+        t.title,
+        u.name AS employee_name,
+        u.email AS employee_email
+      FROM assignments a
+      JOIN tasks t ON t.id = a.task_id
+      JOIN users u ON u.id = a.employee_id
+      WHERE a.id = ? AND t.organization_id = ?
+      `,
+      [req.params.assignmentId, req.activeOrganizationId]
+    );
+
+    if (!assignment) {
+      return res.status(404).render("error", {
+        title: "Brak przydzialu",
+        message: "Nie znaleziono wskazanego przydzialu zadania.",
+      });
+    }
+
+    const steps = await db.all(
+      `
+      SELECT
+        s.id,
+        s.step_text,
+        s.position,
+        s.completed,
+        s.completed_at,
+        COUNT(e.id) AS evidence_count
+      FROM assignment_steps s
+      LEFT JOIN step_evidence e ON e.assignment_step_id = s.id
+      WHERE s.assignment_id = ?
+      GROUP BY s.id
+      ORDER BY s.position ASC
+      `,
+      [assignment.id]
+    );
+
+    const evidence = await db.all(
+      `
+      SELECT
+        e.id,
+        e.assignment_step_id,
+        e.image_path,
+        e.uploaded_at
+      FROM step_evidence e
+      JOIN assignment_steps s ON s.id = e.assignment_step_id
+      WHERE s.assignment_id = ?
+      ORDER BY e.uploaded_at DESC
+      `,
+      [assignment.id]
+    );
+
+    const evidenceByStep = evidence.reduce((acc, item) => {
+      if (!acc[item.assignment_step_id]) {
+        acc[item.assignment_step_id] = [];
+      }
+      acc[item.assignment_step_id].push(item);
+      return acc;
+    }, {});
+
+    const progress = withProgress([
+      {
+        completed_steps: steps.filter((step) => step.completed === 1).length,
+        total_steps: steps.length,
+      },
+    ])[0];
+
+    return res.render("manager/assignment-detail", {
+      title: "Podglad postepu",
+      assignment,
+      steps,
+      evidenceByStep,
+      progress,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+module.exports = router;

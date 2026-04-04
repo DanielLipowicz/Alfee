@@ -1,0 +1,80 @@
+﻿<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= title ? `${title} | Alfee` : "Alfee" %></title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="container header__content">
+        <a class="brand" href="/">Alfee</a>
+        <div class="header__right">
+          <nav class="nav">
+            <% if (currentUser && currentUser.role === "admin") { %>
+            <a href="/admin/organizations">Organizacje</a>
+            <a href="/notifications">
+              Powiadomienia
+              <% if (unreadNotifications > 0) { %>
+              <span class="nav-badge"><%= unreadNotifications %></span>
+              <% } %>
+            </a>
+            <a href="/logout">Wyloguj</a>
+            <% } else if (currentUser && currentUser.role === "manager") { %>
+            <a href="/manager/dashboard">Panel</a>
+            <a href="/manager/tasks">Zadania</a>
+            <a href="/manager/assignments">Postep</a>
+            <a href="/notifications">
+              Powiadomienia
+              <% if (unreadNotifications > 0) { %>
+              <span class="nav-badge"><%= unreadNotifications %></span>
+              <% } %>
+            </a>
+            <a href="/logout">Wyloguj</a>
+            <% } else if (currentUser && currentUser.role === "employee") { %>
+            <a href="/employee/tasks">Moje zadania</a>
+            <a href="/notifications">
+              Powiadomienia
+              <% if (unreadNotifications > 0) { %>
+              <span class="nav-badge"><%= unreadNotifications %></span>
+              <% } %>
+            </a>
+            <a href="/logout">Wyloguj</a>
+          <% } else { %>
+          <a href="/login">Logowanie</a>
+          <a href="/register">Rejestracja</a>
+          <% } %>
+        </nav>
+
+          <% if (currentUser && currentUser.role === "manager") { %>
+          <form class="tenant-switch" method="POST" action="/manager/organization/switch">
+            <label for="organizationId">Organizacja</label>
+            <select
+              id="organizationId"
+              name="organizationId"
+              onchange="this.form.submit()"
+              <%= userOrganizations && userOrganizations.length > 0 ? '' : 'disabled' %>
+            >
+              <% if (!userOrganizations || userOrganizations.length === 0) { %>
+              <option value="">Brak organizacji</option>
+              <% } else { %>
+              <% userOrganizations.forEach((organization) => { %>
+              <option
+                value="<%= organization.id %>"
+                <%= activeOrganization && Number(activeOrganization.id) === Number(organization.id) ? 'selected' : '' %>
+              >
+                <%= organization.name %>
+              </option>
+              <% }) %>
+              <% } %>
+            </select>
+          </form>
+          <% } %>
+        </div>
+      </div>
+    </header>
+    <main class="container content">
+      <% if (flash) { %>
+      <div class="flash flash--<%= flash.type %>"><%= flash.text %></div>
+      <% } %>

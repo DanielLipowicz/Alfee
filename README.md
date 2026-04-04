@@ -91,34 +91,85 @@ npm start
 - Za reverse proxy/HTTPS ustaw `secure` cookie i `trust proxy`.
 - Rozwaz przeniesienie uploadow do obiektu storage (S3/GCS) i dodanie limitow/antywirusa.
 
-## Deploy "as code" na VPS Linux (maly RAM)
+## License and Copyright
 
-Ponizej masz deployment oparty o `Dockerfile` + `docker-compose.yml` (to jest warstwa "as code").
+This software is provided "AS IS" and you use it at your own risk.
+All copyrights and rights to the software belong to:
+**Check-IT Daniel Lipowicz**.
 
-Wymagany adres aplikacji:
+The full license terms are available in `LICENSE.md`.
+
+## Deploy "as code" na VPS Linux (ultra low RAM, bez Dockera)
+
+To jest rekomendowana sciezka dla bardzo malych VPS:
+- bez `docker` i bez `compose`,
+- czysty `node` + `systemd`,
+- limit RAM dla procesu Node.
+
+Docelowy adres:
 - `http://frog01.mikr.us:20120/`
-- port `20120` jest na stale mapowany w `docker-compose.yml`.
+- port `20120` jest wymuszony w usludze systemd.
 
-### 1) Przygotuj VPS (Docker + Compose)
+### 1) Sklonuj repo i uruchom instalator
 
 ```bash
-sudo apt update
-sudo apt install -y ca-certificates curl gnupg
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo usermod -aG docker $USER
+git clone <URL_TWOJEGO_REPO> alfee
+cd alfee
+chmod +x deploy/lowram/install.sh deploy/lowram/update.sh
+./deploy/lowram/install.sh
 ```
 
-Wyloguj i zaloguj sie ponownie, zeby grupa `docker` zaczela dzialac.
+Instalator wykona:
+- instalacje `node`/`npm`,
+- `npm ci --omit=dev`,
+- utworzenie `data/` i `uploads/`,
+- instalacje i start uslugi `alfee.service` z limitem pamieci.
 
-Opcjonalnie (bardzo maly RAM, np. 512 MB): dodaj swap 1G:
+### 2) Ustaw `.env`
+
+```bash
+nano .env
+```
+
+Minimum:
+
+```env
+PORT=20120
+SESSION_SECRET=tu-bardzo-mocny-losowy-sekret
+GOOGLE_CALLBACK_URL=http://frog01.mikr.us:20120/auth/google/callback
+```
+
+Jesli nie uzywasz Google OAuth, pozostaw `GOOGLE_CLIENT_ID` i `GOOGLE_CLIENT_SECRET` puste.
+
+### 3) Restart po zmianie `.env`
+
+```bash
+sudo systemctl restart alfee
+```
+
+### 4) Sprawdz czy dziala
+
+```bash
+sudo systemctl status alfee --no-pager
+journalctl -u alfee -n 100 --no-pager
+```
+
+Jesli masz `ufw`:
+
+```bash
+sudo ufw allow 20120/tcp
+```
+
+Aplikacja powinna dzialac pod:
+- `http://frog01.mikr.us:20120/`
+
+### 5) Aktualizacja aplikacji (as code)
+
+```bash
+./deploy/lowram/update.sh
+```
+
+### 6) Opcjonalnie: swap dla bardzo malych maszyn (np. 512 MB RAM)
 
 ```bash
 sudo fallocate -l 1G /swapfile
@@ -128,60 +179,6 @@ sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
-### 2) Wgraj projekt i ustaw .env
+### 7) Alternatywa: Docker/Compose
 
-```bash
-git clone <URL_TWOJEGO_REPO> alfee
-cd alfee
-cp .env.example .env
-```
-
-Edytuj `.env`:
-
-```env
-PORT=20120
-SESSION_SECRET=tu-bardzo-mocny-losowy-sekret
-GOOGLE_CALLBACK_URL=http://frog01.mikr.us:20120/auth/google/callback
-```
-
-Jesli nie uzywasz Google OAuth, mozesz zostawic `GOOGLE_CLIENT_ID` i `GOOGLE_CLIENT_SECRET` puste.
-
-### 3) Start aplikacji
-
-```bash
-mkdir -p data uploads
-docker compose up -d --build
-```
-
-Sprawdzenie:
-
-```bash
-docker compose ps
-docker compose logs -f --tail=100
-```
-
-Aplikacja powinna byc dostepna pod:
-- `http://frog01.mikr.us:20120/`
-
-### 4) Firewall / port na VPS
-
-Jesli masz `ufw`, odblokuj port:
-
-```bash
-sudo ufw allow 20120/tcp
-```
-
-### 5) Aktualizacja aplikacji
-
-```bash
-git pull
-docker compose up -d --build
-```
-
-### 6) Ustawienia pod niski RAM (juz w kodzie deployu)
-
-W `docker-compose.yml` sa juz ustawione:
-- `mem_limit: 256m`
-- `NODE_OPTIONS=--max-old-space-size=128`
-
-To ogranicza zuzycie pamieci przez Node.js i pomaga na malym VPS.
+Pliki `Dockerfile` i `docker-compose.yml` nadal sa w repo, ale na bardzo malym VPS wariant `systemd` jest zwykle lzejszy i stabilniejszy.

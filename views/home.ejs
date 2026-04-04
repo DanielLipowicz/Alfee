@@ -1,0 +1,23 @@
+﻿<%- include("partials/top", { title }) %>
+
+<section class="hero">
+  <h1>System zadan dla wielu organizacji</h1>
+  <p>
+    Kierownik tworzy i przydziela zadania tylko w aktywnej organizacji.
+    Pracownik realizuje swoje zadania i dodaje zdjecia jako dowody.
+    Administrator zarzadza organizacjami oraz czlonkostwami.
+  </p>
+  <div class="hero__actions">
+    <a class="btn btn--primary" href="/login">Zaloguj lokalnie</a>
+    <a class="btn" href="/register">Zarejestruj konto</a>
+    <% if (googleConfigured) { %>
+    <a class="btn" href="/auth/google">Zaloguj przez Google</a>
+    <% } else { %>
+    <span class="hint"
+      >Brak konfiguracji Google OAuth. Uzupelnij plik <code>.env</code>.</span
+    >
+    <% } %>
+  </div>
+</section>
+
+<%- include("partials/bottom") %>

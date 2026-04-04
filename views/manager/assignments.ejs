@@ -1,0 +1,36 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <h1>Przydzielone zadania</h1>
+
+  <% if (assignments.length === 0) { %>
+  <p>Brak przydzielonych zadań.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Zadanie</th>
+        <th>Pracownik</th>
+        <th>Postęp</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% assignments.forEach((item) => { %>
+      <tr>
+        <td><a href="/manager/assignments/<%= item.id %>"><%= item.title %></a></td>
+        <td><%= item.employee_name %> <span class="muted">(<%= item.employee_email %>)</span></td>
+        <td><%= item.completed_steps %>/<%= item.total_steps %> (<%= item.percentage %>%)</td>
+        <td>
+          <span class="badge <%= item.status === 'completed' ? 'badge--done' : 'badge--progress' %>">
+            <%= item.status === "completed" ? "Ukończone" : "W toku" %>
+          </span>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

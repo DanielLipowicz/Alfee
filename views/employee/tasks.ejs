@@ -1,0 +1,36 @@
+﻿<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <h1>Moje zadania</h1>
+
+  <% if (assignments.length === 0) { %>
+  <p>Nie masz jeszcze przydzielonych zadan.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Zadanie</th>
+        <th>Organizacja</th>
+        <th>Postep</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% assignments.forEach((item) => { %>
+      <tr>
+        <td><a href="/employee/tasks/<%= item.id %>"><%= item.title %></a></td>
+        <td><%= item.organization_name %></td>
+        <td><%= item.completed_steps %>/<%= item.total_steps %> (<%= item.percentage %>%)</td>
+        <td>
+          <span class="badge <%= item.status === 'completed' ? 'badge--done' : 'badge--progress' %>">
+            <%= item.status === "completed" ? "Ukonczone" : "W toku" %>
+          </span>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

@@ -1,0 +1,58 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="grid stats">
+  <article class="card">
+    <h2>Zadania</h2>
+    <strong><%= stats.tasks %></strong>
+  </article>
+  <article class="card">
+    <h2>Pracownicy</h2>
+    <strong><%= stats.employees %></strong>
+  </article>
+  <article class="card">
+    <h2>Przydziały</h2>
+    <strong><%= stats.assignments %></strong>
+  </article>
+  <article class="card">
+    <h2>W trakcie</h2>
+    <strong><%= stats.active %></strong>
+  </article>
+</section>
+
+<section class="card">
+  <div class="section-head">
+    <h2>Najnowsze przydziały</h2>
+    <a class="btn" href="/manager/assignments">Pełny podgląd</a>
+  </div>
+
+  <% if (recentAssignments.length === 0) { %>
+  <p>Brak przydzielonych zadań.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Zadanie</th>
+        <th>Pracownik</th>
+        <th>Postęp</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% recentAssignments.forEach((item) => { %>
+      <tr>
+        <td><a href="/manager/assignments/<%= item.id %>"><%= item.title %></a></td>
+        <td><%= item.employee_name %></td>
+        <td><%= item.completed_steps %>/<%= item.total_steps %> (<%= item.percentage %>%)</td>
+        <td>
+          <span class="badge <%= item.status === 'completed' ? 'badge--done' : 'badge--progress' %>">
+            <%= item.status === "completed" ? "Ukończone" : "W toku" %>
+          </span>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>
