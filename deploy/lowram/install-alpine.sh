@@ -33,7 +33,7 @@ as_root() {
 }
 
 echo "[1/7] Installing system dependencies..."
-as_root apk add --no-cache ca-certificates curl git nodejs npm python3 make g++
+as_root apk add --no-cache ca-certificates curl git nodejs npm python3 build-base libstdc++ linux-headers
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: node was not installed."
@@ -49,7 +49,8 @@ fi
 
 echo "[3/7] Installing app dependencies (production only)..."
 cd "${APP_DIR}"
-npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
+npm_config_jobs=1 npm_config_build_from_source=true NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
+npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
 
 echo "[4/7] Creating runtime directories..."
 mkdir -p data uploads

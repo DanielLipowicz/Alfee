@@ -152,6 +152,20 @@ tail -n 100 /var/log/alfee.err
 ./deploy/lowram/update-alpine.sh
 ```
 
+### Alpine - naprawa bledu sqlite3 (`ERR_DLOPEN_FAILED`)
+
+Jesli pojawi sie blad ladowania `node_sqlite3.node`, wykonaj:
+
+```bash
+cd /home/frog/Alfee
+rm -rf node_modules
+apk add --no-cache python3 build-base libstdc++ linux-headers
+npm_config_jobs=1 npm_config_build_from_source=true NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
+npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
+rc-service alfee restart
+tail -n 100 /var/log/alfee.err
+```
+
 ### Debian/Ubuntu (systemd) - alternatywa
 
 Jesli kiedys przeniesiesz VPS na Debian/Ubuntu:

@@ -25,9 +25,11 @@ NEW_HEAD="$(git rev-parse HEAD)"
 echo "[2/4] Checking if dependency reinstall is required..."
 if git diff --name-only "${OLD_HEAD}" "${NEW_HEAD}" | grep -Eq '(^|/)package(-lock)?\.json$'; then
   echo "package files changed, running npm ci..."
-  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
+  npm_config_jobs=1 npm_config_build_from_source=true NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
+  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
 else
-  echo "package files unchanged, skipping npm ci."
+  echo "package files unchanged, rebuilding sqlite3 for current Alpine toolchain..."
+  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
 fi
 
 echo "[3/4] Ensuring runtime directories..."
