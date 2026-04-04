@@ -101,31 +101,22 @@ The full license terms are available in `LICENSE.md`.
 
 ## Deploy "as code" na VPS Linux (ultra low RAM, bez Dockera)
 
-To jest rekomendowana sciezka dla bardzo malych VPS:
-- bez `docker` i bez `compose`,
-- czysty `node` + `systemd`,
-- limit RAM dla procesu Node.
-
-Docelowy adres:
+Docelowy adres aplikacji:
 - `http://frog01.mikr.us:20120/`
-- port `20120` jest wymuszony w usludze systemd.
+- port `20120` jest wymuszony w skryptach deploy.
 
-### 1) Sklonuj repo i uruchom instalator
+### Alpine Linux (OpenRC) - rekomendowane dla Twojego VPS
+
+1. Sklonuj repo i uruchom instalator:
 
 ```bash
 git clone <URL_TWOJEGO_REPO> alfee
 cd alfee
-chmod +x deploy/lowram/install.sh deploy/lowram/update.sh
-./deploy/lowram/install.sh
+chmod +x deploy/lowram/install-alpine.sh deploy/lowram/update-alpine.sh
+./deploy/lowram/install-alpine.sh
 ```
 
-Instalator wykona:
-- instalacje `node`/`npm`,
-- `npm ci --omit=dev`,
-- utworzenie `data/` i `uploads/`,
-- instalacje i start uslugi `alfee.service` z limitem pamieci.
-
-### 2) Ustaw `.env`
+2. Ustaw `.env`:
 
 ```bash
 nano .env
@@ -141,44 +132,53 @@ GOOGLE_CALLBACK_URL=http://frog01.mikr.us:20120/auth/google/callback
 
 Jesli nie uzywasz Google OAuth, pozostaw `GOOGLE_CLIENT_ID` i `GOOGLE_CLIENT_SECRET` puste.
 
-### 3) Restart po zmianie `.env`
+3. Restart po zmianie `.env`:
 
 ```bash
-sudo systemctl restart alfee
+rc-service alfee restart
 ```
 
-### 4) Sprawdz czy dziala
+4. Sprawdzenie:
 
 ```bash
-sudo systemctl status alfee --no-pager
-journalctl -u alfee -n 100 --no-pager
+rc-service alfee status
+tail -n 100 /var/log/alfee.log
+tail -n 100 /var/log/alfee.err
 ```
 
-Jesli masz `ufw`:
+5. Aktualizacja aplikacji:
 
 ```bash
-sudo ufw allow 20120/tcp
+./deploy/lowram/update-alpine.sh
 ```
 
-Aplikacja powinna dzialac pod:
-- `http://frog01.mikr.us:20120/`
+### Debian/Ubuntu (systemd) - alternatywa
 
-### 5) Aktualizacja aplikacji (as code)
+Jesli kiedys przeniesiesz VPS na Debian/Ubuntu:
+
+```bash
+chmod +x deploy/lowram/install.sh deploy/lowram/update.sh
+./deploy/lowram/install.sh
+```
+
+Aktualizacja:
 
 ```bash
 ./deploy/lowram/update.sh
 ```
 
-### 6) Opcjonalnie: swap dla bardzo malych maszyn (np. 512 MB RAM)
+### Opcjonalnie: swap dla bardzo malych maszyn (np. 512 MB RAM)
+
+Na Alpine:
 
 ```bash
-sudo fallocate -l 1G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+dd if=/dev/zero of=/swapfile bs=1M count=1024
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
-### 7) Alternatywa: Docker/Compose
+### Alternatywa: Docker/Compose
 
-Pliki `Dockerfile` i `docker-compose.yml` nadal sa w repo, ale na bardzo malym VPS wariant `systemd` jest zwykle lzejszy i stabilniejszy.
+Pliki `Dockerfile` i `docker-compose.yml` nadal sa w repo, ale na bardzo malym VPS wariant bez Dockera jest lzejszy.
