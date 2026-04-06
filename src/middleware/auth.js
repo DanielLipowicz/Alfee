@@ -12,9 +12,13 @@ function ensureManager(req, res, next) {
   if (req.user?.role === "manager") {
     return next();
   }
+  if (req.user?.role === "admin" && req.isAdminManagerMode === true) {
+    return next();
+  }
   return res.status(403).render("error", {
     title: "Brak dostepu",
-    message: "Ta sekcja jest dostepna tylko dla kierownika.",
+    message:
+      "Ta sekcja jest dostepna tylko dla kierownika. Administrator moze wejsc w tryb kierownika dla organizacji.",
   });
 }
 

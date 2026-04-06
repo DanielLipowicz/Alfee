@@ -3,12 +3,67 @@
 const { db } = require("../database");
 const { ensureAuthenticated, ensureManager } = require("../middleware/auth");
 const { ensureManagerOrganization } = require("../middleware/tenant");
+const { hashPassword } = require("../security/password");
 const { setFlash } = require("../utils/flash");
 const { normalizeSteps, withProgress } = require("../utils/tasks");
 
 const router = express.Router();
 
 router.use(ensureAuthenticated, ensureManager);
+
+function normalizeEmail(rawEmail) {
+  return String(rawEmail || "").trim().toLowerCase();
+}
+
+function normalizeText(rawValue) {
+  return String(rawValue || "").trim();
+}
+
+function normalizeUsername(rawUsername) {
+  return normalizeText(rawUsername);
+}
+
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function validateUsername(username) {
+  return /^[a-zA-Z0-9._-]{3,40}$/.test(username);
+}
+
+function validatePasswordStrength(password) {
+  const value = String(password || "");
+  if (value.length < 10) {
+    return "Haslo musi miec co najmniej 10 znakow.";
+  }
+  if (!/[a-z]/.test(value)) {
+    return "Haslo musi zawierac mala litere.";
+  }
+  if (!/[A-Z]/.test(value)) {
+    return "Haslo musi zawierac wielka litere.";
+  }
+  if (!/[0-9]/.test(value)) {
+    return "Haslo musi zawierac cyfre.";
+  }
+  if (!/[^a-zA-Z0-9]/.test(value)) {
+    return "Haslo musi zawierac znak specjalny.";
+  }
+  return null;
+}
+
+function buildLocalIdentity(username) {
+  return `local:${username}:${Date.now()}:${Math.round(Math.random() * 1e9)}`;
+}
+
+function renderCreateEmployeeForm(res, formData, flashMessage = null, statusCode = 200) {
+  if (flashMessage) {
+    res.locals.flash = flashMessage;
+  }
+  return res.status(statusCode).render("manager/create-employee", {
+    title: "Nowy pracownik",
+    formData,
+  });
+}
 
 async function rollbackSafely() {
   try {
@@ -42,6 +97,136 @@ router.post("/organization/switch", (req, res) => {
 });
 
 router.use(ensureManagerOrganization);
+
+router.get("/employees/new", (_req, res) => {
+  return renderCreateEmployeeForm(res, {
+    username: "",
+    email: "",
+    name: "",
+    password: "",
+    passwordConfirm: "",
+  });
+});
+
+router.post("/employees", async (req, res, next) => {
+  const username = normalizeUsername(req.body.username);
+  const email = normalizeEmail(req.body.email);
+  const name = normalizeText(req.body.name) || username;
+  const password = String(req.body.password || "");
+  const passwordConfirm = String(req.body.passwordConfirm || "");
+  const formData = {
+    username,
+    email,
+    name,
+    password: "",
+    passwordConfirm: "",
+  };
+
+  if (!username || !email) {
+    return renderCreateEmployeeForm(
+      res,
+      formData,
+      { type: "error", text: "Podaj nazwe uzytkownika i email." },
+      400
+    );
+  }
+
+  if (!validateUsername(username)) {
+    return renderCreateEmployeeForm(
+      res,
+      formData,
+      {
+        type: "error",
+        text: "Nazwa uzytkownika musi miec 3-40 znakow: litery, cyfry, kropka, myslnik lub podkreslenie.",
+      },
+      400
+    );
+  }
+
+  if (!validateEmail(email)) {
+    return renderCreateEmployeeForm(
+      res,
+      formData,
+      { type: "error", text: "Podaj poprawny adres email." },
+      400
+    );
+  }
+
+  const passwordError = validatePasswordStrength(password);
+  if (passwordError) {
+    return renderCreateEmployeeForm(
+      res,
+      formData,
+      { type: "error", text: passwordError },
+      400
+    );
+  }
+
+  if (password !== passwordConfirm) {
+    return renderCreateEmployeeForm(
+      res,
+      formData,
+      { type: "error", text: "Hasla musza byc identyczne." },
+      400
+    );
+  }
+
+  try {
+    const [existingByUsername, existingByEmail] = await Promise.all([
+      db.get("SELECT id FROM users WHERE lower(username) = lower(?)", [username]),
+      db.get("SELECT id FROM users WHERE lower(email) = lower(?)", [email]),
+    ]);
+
+    if (existingByUsername) {
+      return renderCreateEmployeeForm(
+        res,
+        formData,
+        { type: "error", text: "Ta nazwa uzytkownika jest juz zajeta." },
+        409
+      );
+    }
+
+    if (existingByEmail) {
+      return renderCreateEmployeeForm(
+        res,
+        formData,
+        { type: "error", text: "Ten email jest juz zarejestrowany." },
+        409
+      );
+    }
+
+    const localIdentity = buildLocalIdentity(username);
+    const passwordHash = hashPassword(password);
+
+    await db.run("BEGIN TRANSACTION");
+    const created = await db.run(
+      `
+      INSERT INTO users (google_id, username, email, name, auth_provider, password_hash, is_active, role)
+      VALUES (?, ?, ?, ?, 'local', ?, 1, 'employee')
+      `,
+      [localIdentity, username, email, name, passwordHash]
+    );
+
+    await db.run(
+      `
+      INSERT OR IGNORE INTO user_organizations (user_id, organization_id)
+      VALUES (?, ?)
+      `,
+      [created.lastID, req.activeOrganizationId]
+    );
+    await db.run("COMMIT");
+
+    setFlash(
+      req,
+      "success",
+      `Utworzono konto pracownika (${username}) i przypisano je do aktywnej organizacji.`
+    );
+    return res.redirect("/manager/employees/new");
+  } catch (error) {
+    await rollbackSafely();
+    return next(error);
+  }
+});
 
 router.get("/dashboard", async (req, res, next) => {
   try {

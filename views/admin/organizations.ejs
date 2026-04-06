@@ -5,6 +5,12 @@
   <p class="muted">
     Administrator tworzy organizacje i przypisuje do nich kierownikow oraz pracownikow.
   </p>
+  <% if (isAdminManagerMode && activeOrganization) { %>
+  <p>
+    Aktywny tryb kierownika dla organizacji:
+    <strong><%= activeOrganization.name %></strong>
+  </p>
+  <% } %>
 </section>
 
 <section class="grid admin-grid">
@@ -108,6 +114,14 @@
     </div>
 
     <div class="actions">
+      <% if (Number(managerModeOrganizationId || 0) === Number(organization.id)) { %>
+      <a class="btn btn--primary" href="/manager/dashboard">Juz aktywna (otworz panel)</a>
+      <% } else { %>
+      <form method="POST" action="/admin/manager-mode/<%= organization.id %>">
+        <button class="btn btn--primary" type="submit">Wejdz w tryb kierownika</button>
+      </form>
+      <% } %>
+
       <form class="form-inline" method="POST" action="/admin/organizations/<%= organization.id %>?_method=PUT">
         <input
           type="text"

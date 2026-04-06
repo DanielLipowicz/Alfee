@@ -6,10 +6,12 @@ Aplikacja webowa z trzema rolami:
   - tworzy organizacje,
   - edytuje i usuwa organizacje,
   - zarzadza rolami uzytkownikow (admin/kierownik/pracownik),
+  - moze wejsc w tryb kierownika dla wybranej organizacji i korzystac z panelu `/manager/*`,
   - przypisuje kierownikow i pracownikow do organizacji,
   - zarzadza czlonkostwami w tenantach.
 - `manager`:
   - przelacza aktywna organizacje,
+  - tworzy lokalne konta pracownikow i automatycznie przypisuje je do aktywnej organizacji,
   - tworzy, kopiuje, edytuje i usuwa zadania tylko w aktywnej organizacji,
   - przydziela zadania pracownikom nalezacym do tej samej organizacji,
   - sledzi postep i zdjecia dowodowe.

@@ -13,16 +13,38 @@ const router = express.Router();
 router.use(ensureAuthenticated, ensureEmployee);
 
 async function updateAssignmentStatus(assignmentId) {
-  const summary = await db.get(
-    `
-    SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS done
-    FROM assignment_steps
-    WHERE assignment_id = ?
-    `,
-    [assignmentId]
-  );
+  const [assignment, summary] = await Promise.all([
+    db.get(
+      `
+      SELECT
+        a.id,
+        a.status,
+        a.assigned_by,
+        t.title AS task_title,
+        u.name AS employee_name
+      FROM assignments a
+      JOIN tasks t ON t.id = a.task_id
+      JOIN users u ON u.id = a.employee_id
+      WHERE a.id = ?
+      `,
+      [assignmentId]
+    ),
+    db.get(
+      `
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS done,
+        MAX(completed_at) AS completed_at
+      FROM assignment_steps
+      WHERE assignment_id = ?
+      `,
+      [assignmentId]
+    ),
+  ]);
+
+  if (!assignment) {
+    return null;
+  }
 
   const done = Number(summary.done || 0);
   const total = Number(summary.total || 0);
@@ -32,6 +54,16 @@ async function updateAssignmentStatus(assignmentId) {
     status,
     assignmentId,
   ]);
+
+  return {
+    id: assignment.id,
+    previousStatus: assignment.status,
+    status,
+    assignedBy: assignment.assigned_by,
+    employeeName: assignment.employee_name,
+    taskTitle: assignment.task_title,
+    completedAt: summary.completed_at || null,
+  };
 }
 
 router.get("/tasks", async (req, res, next) => {
@@ -200,7 +232,31 @@ router.post(
         [targetCompleted, targetCompleted, step.id]
       );
 
-      await updateAssignmentStatus(req.params.assignmentId);
+      const assignmentUpdate = await updateAssignmentStatus(req.params.assignmentId);
+
+      if (
+        assignmentUpdate &&
+        assignmentUpdate.previousStatus !== "completed" &&
+        assignmentUpdate.status === "completed"
+      ) {
+        const completedAt = assignmentUpdate.completedAt
+          ? `${assignmentUpdate.completedAt} UTC`
+          : "brak danych";
+
+        await db.run(
+          `
+          INSERT INTO notifications (user_id, type, title, message, url)
+          VALUES (?, 'assignment_completed', ?, ?, ?)
+          `,
+          [
+            assignmentUpdate.assignedBy,
+            "Pracownik ukonczyl zadanie",
+            `${assignmentUpdate.employeeName} ukonczyl(a) zadanie "${assignmentUpdate.taskTitle}". Data i godzina zakonczenia prac: ${completedAt}.`,
+            `/manager/assignments/${assignmentUpdate.id}`,
+          ]
+        );
+      }
+
       setFlash(req, "success", "Zaktualizowano status czynnosci.");
       return res.redirect(`/employee/tasks/${req.params.assignmentId}`);
     } catch (error) {

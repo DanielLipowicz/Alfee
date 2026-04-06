@@ -4,6 +4,8 @@ async function loadUserOrganizations(req, res, next) {
   if (!req.user) {
     res.locals.userOrganizations = [];
     res.locals.activeOrganization = null;
+    res.locals.isAdminManagerMode = false;
+    req.isAdminManagerMode = false;
     return next();
   }
 
@@ -25,6 +27,8 @@ async function loadUserOrganizations(req, res, next) {
     res.locals.userOrganizations = organizations;
     req.activeOrganization = null;
     req.activeOrganizationId = null;
+    req.isAdminManagerMode = false;
+    res.locals.isAdminManagerMode = false;
     res.locals.activeOrganization = null;
 
     if (req.user.role === "manager") {
@@ -51,6 +55,32 @@ async function loadUserOrganizations(req, res, next) {
       req.activeOrganizationId = activeOrganizationId;
       req.activeOrganization = activeOrganization || null;
       res.locals.activeOrganization = activeOrganization || null;
+      return next();
+    }
+
+    if (req.user.role === "admin") {
+      const modeOrganizationId = Number(req.session?.adminManagerOrganizationId);
+      if (!modeOrganizationId) {
+        return next();
+      }
+
+      const modeOrganization = await db.get(
+        "SELECT id, name FROM organizations WHERE id = ?",
+        [modeOrganizationId]
+      );
+
+      if (!modeOrganization) {
+        if (req.session) {
+          delete req.session.adminManagerOrganizationId;
+        }
+        return next();
+      }
+
+      req.isAdminManagerMode = true;
+      res.locals.isAdminManagerMode = true;
+      req.activeOrganizationId = Number(modeOrganization.id);
+      req.activeOrganization = modeOrganization;
+      res.locals.activeOrganization = modeOrganization;
     }
 
     return next();
@@ -60,7 +90,10 @@ async function loadUserOrganizations(req, res, next) {
 }
 
 function ensureManagerOrganization(req, res, next) {
-  if (req.user?.role !== "manager") {
+  const requiresManagerContext =
+    req.user?.role === "manager" || req.isAdminManagerMode === true;
+
+  if (!requiresManagerContext) {
     return next();
   }
 

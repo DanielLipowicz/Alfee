@@ -113,6 +113,19 @@ code {
   color: #fff;
 }
 
+.admin-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #dce5f4;
+}
+
+.admin-mode-bar .btn {
+  background: transparent;
+  color: #fff;
+  border-color: #36578a;
+}
+
 .flash {
   border-radius: 10px;
   padding: 0.8rem 1rem;
@@ -410,6 +423,12 @@ select {
 
   .tenant-switch select {
     width: 100%;
+  }
+
+  .admin-mode-bar {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   .step-row {

@@ -1,0 +1,50 @@
+<%- include("partials/top", { title }) %>
+
+<section class="card narrow">
+  <h1>Profil uzytkownika</h1>
+
+  <p><strong>Nazwa uzytkownika:</strong> <%= profileUser.name %></p>
+  <p><strong>Email:</strong> <%= profileUser.email %></p>
+  <p>
+    <strong>Rola:</strong>
+    <%= profileUser.role === "admin" ? "administrator" : profileUser.role === "manager" ? "kierownik" : "pracownik" %>
+  </p>
+</section>
+
+<section class="card narrow">
+  <h2>Zmiana hasla</h2>
+  <form class="form-stack" method="POST" action="/profile/password">
+    <label>
+      Aktualne haslo
+      <input
+        type="password"
+        name="currentPassword"
+        required
+        autocomplete="current-password"
+      />
+    </label>
+
+    <label>
+      Nowe haslo
+      <input type="password" name="newPassword" required autocomplete="new-password" />
+    </label>
+
+    <label>
+      Powtorz nowe haslo
+      <input
+        type="password"
+        name="confirmPassword"
+        required
+        autocomplete="new-password"
+      />
+    </label>
+
+    <p class="muted">
+      Haslo musi miec min. 10 znakow, mala i wielka litere, cyfre oraz znak specjalny.
+    </p>
+
+    <button class="btn btn--primary" type="submit">Zmien haslo</button>
+  </form>
+</section>
+
+<%- include("partials/bottom") %>

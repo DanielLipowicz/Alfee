@@ -13,6 +13,7 @@ const adminRoutes = require("./src/routes/adminRoutes");
 const managerRoutes = require("./src/routes/managerRoutes");
 const employeeRoutes = require("./src/routes/employeeRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
+const profileRoutes = require("./src/routes/profileRoutes");
 const { ensureAuthenticated } = require("./src/middleware/auth");
 const { loadUserOrganizations } = require("./src/middleware/tenant");
 const { hashPassword, verifyPassword } = require("./src/security/password");
@@ -366,6 +367,7 @@ app.use(async (req, res, next) => {
     res.locals.flash = req.session?.flash || null;
     res.locals.googleConfigured = googleConfigured;
     res.locals.unreadNotifications = 0;
+    res.locals.isAdminManagerMode = false;
 
     if (req.session?.flash) {
       delete req.session.flash;
@@ -388,6 +390,9 @@ app.use(loadUserOrganizations);
 
 function redirectByRole(req, res) {
   if (req.user.role === "admin") {
+    if (req.isAdminManagerMode === true) {
+      return res.redirect("/manager/dashboard");
+    }
     return res.redirect("/admin/organizations");
   }
   if (req.user.role === "manager") {
@@ -698,6 +703,7 @@ app.use("/admin", adminRoutes);
 app.use("/manager", managerRoutes);
 app.use("/employee", employeeRoutes);
 app.use("/notifications", notificationRoutes);
+app.use("/profile", profileRoutes);
 
 app.use((req, res) => {
   res.status(404).render("error", {

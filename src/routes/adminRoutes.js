@@ -84,11 +84,51 @@ router.get("/organizations", async (_req, res, next) => {
       organizations,
       users,
       allUsers,
+      managerModeOrganizationId: Number(
+        _req.session?.adminManagerOrganizationId || 0
+      ),
       membersByOrganization,
     });
   } catch (error) {
     return next(error);
   }
+});
+
+router.post("/manager-mode/:organizationId", async (req, res, next) => {
+  const organizationId = Number(req.params.organizationId);
+  if (!organizationId) {
+    setFlash(req, "error", "Niepoprawna organizacja dla trybu kierownika.");
+    return res.redirect("/admin/organizations");
+  }
+
+  try {
+    const organization = await db.get(
+      "SELECT id, name FROM organizations WHERE id = ?",
+      [organizationId]
+    );
+    if (!organization) {
+      setFlash(req, "error", "Nie znaleziono wskazanej organizacji.");
+      return res.redirect("/admin/organizations");
+    }
+
+    req.session.adminManagerOrganizationId = Number(organization.id);
+    setFlash(
+      req,
+      "success",
+      `Wlaczono tryb kierownika dla organizacji "${organization.name}".`
+    );
+    return res.redirect("/manager/dashboard");
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/manager-mode/exit", (req, res) => {
+  if (req.session) {
+    delete req.session.adminManagerOrganizationId;
+  }
+  setFlash(req, "success", "Wylaczono tryb kierownika.");
+  return res.redirect("/admin/organizations");
 });
 
 router.put("/organizations/:organizationId", async (req, res, next) => {

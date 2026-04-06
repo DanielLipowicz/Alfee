@@ -1,0 +1,71 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card narrow">
+  <div class="section-head">
+    <h1>Nowe konto pracownika</h1>
+    <a class="btn" href="/manager/dashboard">Powrot do panelu</a>
+  </div>
+
+  <p class="muted">
+    Konto zostanie utworzone jako lokalne i od razu przypisane do aktywnej organizacji.
+  </p>
+
+  <form class="form-stack" method="POST" action="/manager/employees">
+    <label>
+      Nazwa uzytkownika
+      <input
+        type="text"
+        name="username"
+        value="<%= formData?.username || '' %>"
+        required
+        minlength="3"
+        maxlength="40"
+        autocomplete="username"
+      />
+    </label>
+
+    <label>
+      Email
+      <input
+        type="email"
+        name="email"
+        value="<%= formData?.email || '' %>"
+        required
+        autocomplete="email"
+      />
+    </label>
+
+    <label>
+      Imie i nazwisko (opcjonalnie)
+      <input
+        type="text"
+        name="name"
+        value="<%= formData?.name || '' %>"
+        autocomplete="name"
+      />
+    </label>
+
+    <label>
+      Haslo
+      <input type="password" name="password" required autocomplete="new-password" />
+    </label>
+
+    <label>
+      Powtorz haslo
+      <input
+        type="password"
+        name="passwordConfirm"
+        required
+        autocomplete="new-password"
+      />
+    </label>
+
+    <p class="muted">
+      Haslo musi miec min. 10 znakow, mala i wielka litere, cyfre oraz znak specjalny.
+    </p>
+
+    <button class="btn btn--primary" type="submit">Utworz konto pracownika</button>
+  </form>
+</section>
+
+<%- include("../partials/bottom") %>
