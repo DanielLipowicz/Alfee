@@ -117,7 +117,6 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       google_id TEXT UNIQUE,
-      username TEXT,
       email TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       auth_provider TEXT NOT NULL DEFAULT 'google',
@@ -129,10 +128,6 @@ async function initDatabase() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
-
-  if (!(await tableHasColumn("users", "username"))) {
-    await db.run("ALTER TABLE users ADD COLUMN username TEXT");
-  }
 
   if (!(await tableHasColumn("users", "auth_provider"))) {
     await db.run(
@@ -262,6 +257,120 @@ async function initDatabase() {
     )
   `);
 
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS haccp_processes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      organization_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      frequency_type TEXT NOT NULL DEFAULT 'NONE',
+      frequency_value INTEGER,
+      is_ccp INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by INTEGER NOT NULL,
+      updated_at TEXT,
+      updated_by INTEGER,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS haccp_process_fields (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      process_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      required INTEGER NOT NULL DEFAULT 0,
+      min_value REAL,
+      max_value REAL,
+      allowed_values TEXT,
+      field_order INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (process_id) REFERENCES haccp_processes(id) ON DELETE CASCADE
+    )
+  `);
+
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS haccp_process_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      process_id INTEGER NOT NULL,
+      organization_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'OK',
+      is_reviewed INTEGER NOT NULL DEFAULT 0,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
+      FOREIGN KEY (process_id) REFERENCES haccp_processes(id) ON DELETE RESTRICT,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
+      FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS haccp_process_entry_values (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entry_id INTEGER NOT NULL,
+      field_id INTEGER NOT NULL,
+      value TEXT,
+      FOREIGN KEY (entry_id) REFERENCES haccp_process_entries(id) ON DELETE CASCADE,
+      FOREIGN KEY (field_id) REFERENCES haccp_process_fields(id) ON DELETE RESTRICT,
+      UNIQUE (entry_id, field_id)
+    )
+  `);
+
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS haccp_corrective_actions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entry_id INTEGER NOT NULL,
+      description TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by INTEGER NOT NULL,
+      FOREIGN KEY (entry_id) REFERENCES haccp_process_entries(id) ON DELETE CASCADE,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+    )
+  `);
+
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS haccp_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      organization_id INTEGER NOT NULL,
+      process_id INTEGER,
+      entry_id INTEGER,
+      severity TEXT NOT NULL DEFAULT 'LOW',
+      message TEXT NOT NULL,
+      alert_type TEXT NOT NULL DEFAULT 'ENTRY_DEVIATION',
+      dedupe_key TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      resolved INTEGER NOT NULL DEFAULT 0,
+      resolved_at TEXT,
+      resolved_by INTEGER,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (process_id) REFERENCES haccp_processes(id) ON DELETE SET NULL,
+      FOREIGN KEY (entry_id) REFERENCES haccp_process_entries(id) ON DELETE SET NULL,
+      FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS haccp_audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      organization_id INTEGER,
+      entity_type TEXT NOT NULL,
+      entity_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_by INTEGER,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
   await db.run(
     "CREATE INDEX IF NOT EXISTS idx_tasks_organization_id ON tasks (organization_id)"
   );
@@ -272,10 +381,43 @@ async function initDatabase() {
     "CREATE INDEX IF NOT EXISTS idx_user_organizations_org_id ON user_organizations (organization_id)"
   );
   await db.run(
-    "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_unique ON users (username)"
+    "CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications (user_id, is_read)"
   );
   await db.run(
-    "CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications (user_id, is_read)"
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_haccp_process_org_name ON haccp_processes (organization_id, name)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_process_org_active ON haccp_processes (organization_id, is_active)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_fields_process_order ON haccp_process_fields (process_id, field_order)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_entries_process_created ON haccp_process_entries (process_id, created_at)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_entries_org_created ON haccp_process_entries (organization_id, created_at)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_entries_creator ON haccp_process_entries (created_by, created_at)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_values_entry ON haccp_process_entry_values (entry_id)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_actions_entry ON haccp_corrective_actions (entry_id)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_alerts_org_created ON haccp_alerts (organization_id, created_at)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_alerts_entry ON haccp_alerts (entry_id)"
+  );
+  await db.run(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_haccp_alerts_dedupe ON haccp_alerts (dedupe_key)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_audit_org_created ON haccp_audit_logs (organization_id, created_at)"
   );
 
   await migrateTenantData();

@@ -1,4 +1,4 @@
-﻿<%- include("../partials/top", { title }) %>
+<%- include("../partials/top", { title }) %>
 
 <section class="card">
   <h1><%= assignment.title %></h1>
@@ -8,66 +8,486 @@
   </p>
   <p>
     Status:
-    <span class="badge <%= assignment.status === 'completed' ? 'badge--done' : 'badge--progress' %>">
+    <span
+      class="badge js-assignment-status-badge <%= assignment.status === 'completed' ? 'badge--done' : 'badge--progress' %>"
+    >
       <%= assignment.status === "completed" ? "Ukonczone" : "W toku" %>
     </span>
   </p>
-  <p>Postep: <strong><%= progress.completed_steps %>/<%= progress.total_steps %> (<%= progress.percentage %>%)</strong></p>
+  <p>
+    Postep:
+    <strong class="js-assignment-progress"
+      ><%= progress.completed_steps %>/<%= progress.total_steps %> (<%= progress.percentage %>%)</strong
+    >
+  </p>
 </section>
 
-<section class="card">
-  <h2>Czynnosci do wykonania</h2>
-  <ol class="steps">
-    <% steps.forEach((step) => { %>
-    <li class="step-item">
+<section class="card task-steps-card">
+  <div class="task-steps-card__head">
+    <h2>Czynnosci do wykonania</h2>
+    <p class="muted">
+      Oznacz krok jako wykonany, a potem dodaj zdjecie dowodowe. Po wyborze pliku wysylka startuje automatycznie.
+    </p>
+  </div>
+
+  <div class="steps-progress">
+    <div class="steps-progress__label">Postep wykonania</div>
+    <div
+      class="steps-progress__track js-assignment-progress-track"
+      role="progressbar"
+      aria-label="Postep wykonania zadania"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="<%= progress.percentage %>"
+    >
+      <span class="steps-progress__value js-assignment-progress-bar" style="width: <%= progress.percentage %>%"></span>
+    </div>
+  </div>
+
+  <ol class="steps steps--cards">
+    <% steps.forEach((step, index) => { %>
+    <% const isCompleted = Number(step.completed) === 1; %>
+    <li
+      class="step-item js-step-item <%= isCompleted ? 'step-item--completed' : '' %>"
+      data-step-id="<%= step.id %>"
+      data-completed="<%= isCompleted ? '1' : '0' %>"
+    >
       <div class="step-head">
-        <strong><%= step.step_text %></strong>
-        <span class="badge <%= step.completed === 1 ? 'badge--done' : 'badge--progress' %>">
-          <%= step.completed === 1 ? "Ukonczona" : "Niewykonana" %>
+        <p class="step-index">Krok <%= index + 1 %></p>
+        <span class="badge js-step-badge <%= isCompleted ? 'badge--done' : 'badge--progress' %>">
+          <%= isCompleted ? "Ukonczona" : "Niewykonana" %>
         </span>
       </div>
 
-      <div class="actions">
-        <form method="POST" action="/employee/tasks/<%= assignment.id %>/steps/<%= step.id %>/toggle">
-          <button class="btn" type="submit">
-            <%= step.completed === 1 ? "Cofnij ukonczenie" : "Oznacz jako ukonczona" %>
+      <p class="step-text"><%= step.step_text %></p>
+
+      <div class="step-actions">
+        <form
+          class="js-toggle-step-form"
+          method="POST"
+          action="/employee/tasks/<%= assignment.id %>/steps/<%= step.id %>/toggle"
+        >
+          <button class="btn js-toggle-step-button <%= isCompleted ? '' : 'btn--primary' %>" type="submit">
+            <%= isCompleted ? "Cofnij ukonczenie" : "Oznacz jako ukonczona" %>
           </button>
+        </form>
+
+        <form
+          class="js-evidence-form step-evidence-form"
+          method="POST"
+          action="/employee/tasks/<%= assignment.id %>/steps/<%= step.id %>/evidence"
+          enctype="multipart/form-data"
+        >
+          <label class="step-upload-label" for="evidence-<%= step.id %>">Dowod (zdjecie)</label>
+          <input
+            id="evidence-<%= step.id %>"
+            class="js-evidence-input step-evidence-input"
+            type="file"
+            name="evidenceImage"
+            multiple
+            accept="image/*"
+            capture="environment"
+            required
+          />
         </form>
       </div>
 
-      <form
-        class="form-inline"
-        method="POST"
-        action="/employee/tasks/<%= assignment.id %>/steps/<%= step.id %>/evidence"
-        enctype="multipart/form-data"
-      >
-        <input
-          type="file"
-          name="evidenceImage"
-          accept="image/*"
-          capture="environment"
-          required
-        />
-        <button class="btn btn--primary" type="submit">Dodaj zdjecie</button>
-      </form>
-      <p class="muted">Na telefonie mozesz zrobic zdjecie bezposrednio aparatem.</p>
+      <p class="muted step-hint js-evidence-hint">
+        Na telefonie mozesz zrobic zdjecie aparatem. Na komputerze mozesz wybrac wiele zdjec naraz.
+      </p>
+      <p class="muted step-feedback js-step-feedback" aria-live="polite"></p>
 
       <% const evidence = evidenceByStep[step.id] || []; %>
-      <% if (evidence.length === 0) { %>
-      <p class="muted">Brak zdjec.</p>
-      <% } else { %>
-      <div class="evidence-grid">
+      <p class="muted js-no-evidence step-no-evidence" <%= evidence.length === 0 ? "" : "hidden" %>>
+        Brak zdjec dowodowych.
+      </p>
+      <div class="evidence-grid js-evidence-grid" <%= evidence.length === 0 ? "hidden" : "" %>>
         <% evidence.forEach((item) => { %>
-        <figure>
+        <figure class="evidence-item js-evidence-item" data-evidence-id="<%= item.id %>">
           <img src="<%= item.image_path %>" alt="Zdjecie dowodowe" />
-          <figcaption><%= item.uploaded_at %></figcaption>
+          <figcaption>Dodano: <%= item.uploaded_at %></figcaption>
+          <form
+            class="evidence-actions js-delete-evidence-form"
+            method="POST"
+            action="/employee/tasks/<%= assignment.id %>/steps/<%= step.id %>/evidence/<%= item.id %>/delete"
+          >
+            <button class="btn btn--danger" type="submit">Usun zdjecie</button>
+          </form>
         </figure>
         <% }) %>
       </div>
-      <% } %>
     </li>
     <% }) %>
   </ol>
 </section>
+
+<script>
+  (() => {
+    const statusBadge = document.querySelector(".js-assignment-status-badge");
+    const progressText = document.querySelector(".js-assignment-progress");
+    const progressTrack = document.querySelector(".js-assignment-progress-track");
+    const progressBar = document.querySelector(".js-assignment-progress-bar");
+    const stepItems = document.querySelectorAll(".js-step-item");
+
+    if (!statusBadge || !progressText || stepItems.length === 0) {
+      return;
+    }
+
+    const feedbackClasses = [
+      "step-feedback--success",
+      "step-feedback--error",
+      "step-feedback--pending",
+    ];
+
+    function setFeedback(stepItem, message, type) {
+      const feedback = stepItem.querySelector(".js-step-feedback");
+      if (!feedback) {
+        return;
+      }
+
+      feedback.textContent = message || "";
+      feedback.classList.remove(...feedbackClasses);
+      if (type) {
+        feedback.classList.add(`step-feedback--${type}`);
+      }
+    }
+
+    function setEvidenceAvailability(stepItem, isCompleted) {
+      const evidenceHint = stepItem.querySelector(".js-evidence-hint");
+
+      stepItem.dataset.completed = isCompleted ? "1" : "0";
+      stepItem.classList.toggle("step-item--completed", isCompleted);
+
+      if (evidenceHint) {
+        evidenceHint.textContent =
+          "Na telefonie mozesz zrobic zdjecie aparatem. Na komputerze mozesz wybrac wiele zdjec naraz.";
+      }
+    }
+
+    function updateStep(stepItem, completed) {
+      const badge = stepItem.querySelector(".js-step-badge");
+      const button = stepItem.querySelector(".js-toggle-step-button");
+      const isCompleted = Number(completed) === 1;
+
+      if (badge) {
+        badge.classList.toggle("badge--done", isCompleted);
+        badge.classList.toggle("badge--progress", !isCompleted);
+        badge.textContent = isCompleted ? "Ukonczona" : "Niewykonana";
+      }
+
+      if (button) {
+        button.classList.toggle("btn--primary", !isCompleted);
+        button.textContent = isCompleted
+          ? "Cofnij ukonczenie"
+          : "Oznacz jako ukonczona";
+      }
+
+      setEvidenceAvailability(stepItem, isCompleted);
+    }
+
+    function updateAssignment(assignment) {
+      if (!assignment || !assignment.progress) {
+        return;
+      }
+
+      const isCompleted = assignment.status === "completed";
+      statusBadge.classList.toggle("badge--done", isCompleted);
+      statusBadge.classList.toggle("badge--progress", !isCompleted);
+      statusBadge.textContent = isCompleted ? "Ukonczone" : "W toku";
+
+      const { completed_steps, total_steps, percentage } = assignment.progress;
+      progressText.textContent = `${completed_steps}/${total_steps} (${percentage}%)`;
+
+      if (progressBar) {
+        progressBar.style.width = `${percentage}%`;
+      }
+      if (progressTrack) {
+        progressTrack.setAttribute("aria-valuenow", String(percentage));
+      }
+    }
+
+    function scrollToFirstIncompleteStep() {
+      const firstIncompleteStep = Array.from(stepItems).find(
+        (item) => item.dataset.completed !== "1"
+      );
+
+      if (!firstIncompleteStep) {
+        return;
+      }
+
+      firstIncompleteStep.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      const firstIncompleteButton = firstIncompleteStep.querySelector(
+        ".js-toggle-step-button"
+      );
+      if (firstIncompleteButton) {
+        setTimeout(() => {
+          firstIncompleteButton.focus();
+        }, 280);
+      }
+    }
+
+    function bindDeleteEvidenceForm(form, stepItem) {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        submitDeleteEvidence(form, stepItem);
+      });
+    }
+
+    function appendEvidence(stepItem, evidence) {
+      if (!evidence || !evidence.image_path || evidence.id == null) {
+        return;
+      }
+
+      const noEvidence = stepItem.querySelector(".js-no-evidence");
+      const grid = stepItem.querySelector(".js-evidence-grid");
+      if (!grid) {
+        return;
+      }
+
+      if (noEvidence) {
+        noEvidence.hidden = true;
+      }
+      grid.hidden = false;
+
+      const figure = document.createElement("figure");
+      figure.className = "evidence-item js-evidence-item";
+      figure.dataset.evidenceId = String(evidence.id);
+
+      const image = document.createElement("img");
+      image.src = evidence.image_path;
+      image.alt = "Zdjecie dowodowe";
+
+      const caption = document.createElement("figcaption");
+      caption.textContent = `Dodano: ${evidence.uploaded_at || "Przed chwila"}`;
+
+      const deleteForm = document.createElement("form");
+      deleteForm.className = "evidence-actions js-delete-evidence-form";
+      deleteForm.method = "POST";
+      deleteForm.action = `/employee/tasks/<%= assignment.id %>/steps/${stepItem.dataset.stepId}/evidence/${evidence.id}/delete`;
+
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "btn btn--danger";
+      deleteButton.type = "submit";
+      deleteButton.textContent = "Usun zdjecie";
+      deleteForm.append(deleteButton);
+
+      figure.append(image, caption, deleteForm);
+      grid.prepend(figure);
+      bindDeleteEvidenceForm(deleteForm, stepItem);
+    }
+
+    function removeEvidence(stepItem, evidenceId) {
+      const noEvidence = stepItem.querySelector(".js-no-evidence");
+      const grid = stepItem.querySelector(".js-evidence-grid");
+      if (!grid) {
+        return;
+      }
+
+      const evidenceItem = Array.from(grid.querySelectorAll(".js-evidence-item")).find(
+        (item) => item.dataset.evidenceId === String(evidenceId)
+      );
+
+      if (evidenceItem) {
+        evidenceItem.remove();
+      }
+
+      if (grid.children.length === 0) {
+        grid.hidden = true;
+        if (noEvidence) {
+          noEvidence.hidden = false;
+        }
+      }
+    }
+
+    async function parseJson(response) {
+      try {
+        return await response.json();
+      } catch (_error) {
+        return null;
+      }
+    }
+
+    async function submitToggle(form, stepItem) {
+      if (form.dataset.busy === "1") {
+        return;
+      }
+
+      const button = form.querySelector(".js-toggle-step-button");
+      form.dataset.busy = "1";
+      if (button) {
+        button.disabled = true;
+      }
+      setFeedback(stepItem, "Zapisywanie statusu...", "pending");
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        const payload = await parseJson(response);
+        if (!response.ok || !payload || !payload.ok) {
+          throw new Error(
+            (payload && payload.error) || "Nie udalo sie zaktualizowac statusu."
+          );
+        }
+
+        updateStep(stepItem, payload.step.completed);
+        updateAssignment(payload.assignment);
+        setFeedback(stepItem, payload.message || "Zaktualizowano status.", "success");
+
+        if (Number(payload.step.completed) === 1) {
+          scrollToFirstIncompleteStep();
+        }
+      } catch (error) {
+        setFeedback(stepItem, error.message, "error");
+      } finally {
+        form.dataset.busy = "0";
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
+
+    async function submitEvidence(form, stepItem) {
+      if (form.dataset.busy === "1") {
+        return;
+      }
+
+      const input = form.querySelector(".js-evidence-input");
+      if (!input) {
+        return;
+      }
+      if (!input.files || input.files.length === 0) {
+        setFeedback(stepItem, "Wybierz plik graficzny do wyslania.", "error");
+        return;
+      }
+
+      const formData = new FormData(form);
+      form.dataset.busy = "1";
+      input.disabled = true;
+      setFeedback(stepItem, "Wysylanie zdjecia...", "pending");
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        const payload = await parseJson(response);
+        if (!response.ok || !payload || !payload.ok) {
+          throw new Error((payload && payload.error) || "Nie udalo sie dodac zdjecia.");
+        }
+
+        const evidenceItems = Array.isArray(payload.evidenceItems)
+          ? payload.evidenceItems
+          : payload.evidence
+            ? [payload.evidence]
+            : [];
+
+        for (let index = evidenceItems.length - 1; index >= 0; index -= 1) {
+          appendEvidence(stepItem, evidenceItems[index]);
+        }
+
+        setFeedback(
+          stepItem,
+          payload.message || "Dodano zdjecia jako dowod wykonania.",
+          "success"
+        );
+      } catch (error) {
+        setFeedback(stepItem, error.message, "error");
+      } finally {
+        form.dataset.busy = "0";
+        input.disabled = false;
+        input.value = "";
+      }
+    }
+
+    async function submitDeleteEvidence(form, stepItem) {
+      if (form.dataset.busy === "1") {
+        return;
+      }
+
+      const confirmed = window.confirm("Czy na pewno chcesz usunac to zdjecie?");
+      if (!confirmed) {
+        return;
+      }
+
+      const button = form.querySelector("button");
+      form.dataset.busy = "1";
+      if (button) {
+        button.disabled = true;
+      }
+      setFeedback(stepItem, "Usuwanie zdjecia...", "pending");
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        const payload = await parseJson(response);
+        if (!response.ok || !payload || !payload.ok) {
+          throw new Error((payload && payload.error) || "Nie udalo sie usunac zdjecia.");
+        }
+
+        removeEvidence(stepItem, payload.evidenceId);
+        setFeedback(stepItem, payload.message || "Usunieto zdjecie.", "success");
+      } catch (error) {
+        setFeedback(stepItem, error.message, "error");
+      } finally {
+        form.dataset.busy = "0";
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
+
+    stepItems.forEach((stepItem) => {
+      setEvidenceAvailability(stepItem, stepItem.dataset.completed === "1");
+
+      const toggleForm = stepItem.querySelector(".js-toggle-step-form");
+      if (toggleForm) {
+        toggleForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          submitToggle(toggleForm, stepItem);
+        });
+      }
+
+      const evidenceForm = stepItem.querySelector(".js-evidence-form");
+      if (evidenceForm) {
+        evidenceForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          submitEvidence(evidenceForm, stepItem);
+        });
+
+        const evidenceInput = evidenceForm.querySelector(".js-evidence-input");
+        if (evidenceInput) {
+          evidenceInput.addEventListener("change", () => {
+            if (evidenceInput.files && evidenceInput.files.length > 0) {
+              submitEvidence(evidenceForm, stepItem);
+            }
+          });
+        }
+      }
+
+      const deleteForms = stepItem.querySelectorAll(".js-delete-evidence-form");
+      deleteForms.forEach((form) => {
+        bindDeleteEvidenceForm(form, stepItem);
+      });
+    });
+  })();
+</script>
 
 <%- include("../partials/bottom") %>

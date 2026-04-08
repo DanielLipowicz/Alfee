@@ -11,6 +11,14 @@ const router = express.Router();
 
 router.use(ensureAuthenticated, ensureManager);
 
+async function refreshUnreadNotificationsCount(userId, res) {
+  const unread = await db.get(
+    "SELECT COUNT(*) AS total FROM notifications WHERE user_id = ? AND is_read = 0",
+    [userId]
+  );
+  res.locals.unreadNotifications = Number(unread?.total || 0);
+}
+
 function normalizeEmail(rawEmail) {
   return String(rawEmail || "").trim().toLowerCase();
 }
@@ -19,16 +27,8 @@ function normalizeText(rawValue) {
   return String(rawValue || "").trim();
 }
 
-function normalizeUsername(rawUsername) {
-  return normalizeText(rawUsername);
-}
-
 function validateEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function validateUsername(username) {
-  return /^[a-zA-Z0-9._-]{3,40}$/.test(username);
 }
 
 function validatePasswordStrength(password) {
@@ -51,8 +51,8 @@ function validatePasswordStrength(password) {
   return null;
 }
 
-function buildLocalIdentity(username) {
-  return `local:${username}:${Date.now()}:${Math.round(Math.random() * 1e9)}`;
+function buildLocalIdentity(email) {
+  return `local:${email}:${Date.now()}:${Math.round(Math.random() * 1e9)}`;
 }
 
 function renderCreateEmployeeForm(res, formData, flashMessage = null, statusCode = 200) {
@@ -100,7 +100,6 @@ router.use(ensureManagerOrganization);
 
 router.get("/employees/new", (_req, res) => {
   return renderCreateEmployeeForm(res, {
-    username: "",
     email: "",
     name: "",
     password: "",
@@ -109,36 +108,22 @@ router.get("/employees/new", (_req, res) => {
 });
 
 router.post("/employees", async (req, res, next) => {
-  const username = normalizeUsername(req.body.username);
   const email = normalizeEmail(req.body.email);
-  const name = normalizeText(req.body.name) || username;
+  const name = normalizeText(req.body.name);
   const password = String(req.body.password || "");
   const passwordConfirm = String(req.body.passwordConfirm || "");
   const formData = {
-    username,
     email,
     name,
     password: "",
     passwordConfirm: "",
   };
 
-  if (!username || !email) {
+  if (!email || !name) {
     return renderCreateEmployeeForm(
       res,
       formData,
-      { type: "error", text: "Podaj nazwe uzytkownika i email." },
-      400
-    );
-  }
-
-  if (!validateUsername(username)) {
-    return renderCreateEmployeeForm(
-      res,
-      formData,
-      {
-        type: "error",
-        text: "Nazwa uzytkownika musi miec 3-40 znakow: litery, cyfry, kropka, myslnik lub podkreslenie.",
-      },
+      { type: "error", text: "Podaj email oraz imie i nazwisko." },
       400
     );
   }
@@ -148,6 +133,15 @@ router.post("/employees", async (req, res, next) => {
       res,
       formData,
       { type: "error", text: "Podaj poprawny adres email." },
+      400
+    );
+  }
+
+  if (name.length > 120) {
+    return renderCreateEmployeeForm(
+      res,
+      formData,
+      { type: "error", text: "Imie i nazwisko moze miec maksymalnie 120 znakow." },
       400
     );
   }
@@ -172,19 +166,10 @@ router.post("/employees", async (req, res, next) => {
   }
 
   try {
-    const [existingByUsername, existingByEmail] = await Promise.all([
-      db.get("SELECT id FROM users WHERE lower(username) = lower(?)", [username]),
-      db.get("SELECT id FROM users WHERE lower(email) = lower(?)", [email]),
-    ]);
-
-    if (existingByUsername) {
-      return renderCreateEmployeeForm(
-        res,
-        formData,
-        { type: "error", text: "Ta nazwa uzytkownika jest juz zajeta." },
-        409
-      );
-    }
+    const existingByEmail = await db.get(
+      "SELECT id FROM users WHERE lower(email) = lower(?)",
+      [email]
+    );
 
     if (existingByEmail) {
       return renderCreateEmployeeForm(
@@ -195,16 +180,16 @@ router.post("/employees", async (req, res, next) => {
       );
     }
 
-    const localIdentity = buildLocalIdentity(username);
+    const localIdentity = buildLocalIdentity(email);
     const passwordHash = hashPassword(password);
 
     await db.run("BEGIN TRANSACTION");
     const created = await db.run(
       `
-      INSERT INTO users (google_id, username, email, name, auth_provider, password_hash, is_active, role)
-      VALUES (?, ?, ?, ?, 'local', ?, 1, 'employee')
+      INSERT INTO users (google_id, email, name, auth_provider, password_hash, is_active, role)
+      VALUES (?, ?, ?, 'local', ?, 1, 'employee')
       `,
-      [localIdentity, username, email, name, passwordHash]
+      [localIdentity, email, name, passwordHash]
     );
 
     await db.run(
@@ -219,7 +204,7 @@ router.post("/employees", async (req, res, next) => {
     setFlash(
       req,
       "success",
-      `Utworzono konto pracownika (${username}) i przypisano je do aktywnej organizacji.`
+      `Utworzono konto pracownika (${email}) i przypisano je do aktywnej organizacji.`
     );
     return res.redirect("/manager/employees/new");
   } catch (error) {
@@ -702,6 +687,16 @@ router.get("/assignments/:assignmentId", async (req, res, next) => {
         message: "Nie znaleziono wskazanego przydzialu zadania.",
       });
     }
+
+    await db.run(
+      `
+      UPDATE notifications
+      SET is_read = 1, read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
+      WHERE user_id = ? AND url = ? AND is_read = 0
+      `,
+      [req.user.id, `/manager/assignments/${assignment.id}`]
+    );
+    await refreshUnreadNotificationsCount(req.user.id, res);
 
     const steps = await db.all(
       `

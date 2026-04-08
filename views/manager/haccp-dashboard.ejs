@@ -1,0 +1,112 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="grid stats">
+  <article class="card">
+    <h2>Aktywne procesy</h2>
+    <strong><%= stats.activeProcesses %></strong>
+  </article>
+  <article class="card">
+    <h2>Wpisy dzisiaj</h2>
+    <strong><%= stats.entriesToday %></strong>
+  </article>
+  <article class="card">
+    <h2>Otwarte alerty</h2>
+    <strong><%= stats.openAlerts %></strong>
+  </article>
+  <article class="card">
+    <h2>Krytyczne alerty</h2>
+    <strong><%= stats.criticalAlerts %></strong>
+  </article>
+</section>
+
+<section class="card">
+  <div class="section-head">
+    <h1>HACCP</h1>
+    <div class="actions">
+      <a class="btn btn--primary" href="/manager/haccp/processes/new">Nowy proces</a>
+      <a class="btn" href="/manager/haccp/alerts">Alerty</a>
+      <a class="btn" href="/manager/haccp/reports">Wpisy i raporty</a>
+    </div>
+  </div>
+  <p class="muted">
+    Dokumentacja HACCP z walidacja, audytem, alertami i dzialaniami korygujacymi.
+  </p>
+</section>
+
+<section class="card">
+  <div class="section-head">
+    <h2>Najnowsze wpisy</h2>
+    <a class="btn" href="/manager/haccp/reports">Pelna lista</a>
+  </div>
+
+  <% if (latestEntries.length === 0) { %>
+  <p>Brak wpisow HACCP.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Proces</th>
+        <th>Status</th>
+        <th>Autor</th>
+        <th>Data</th>
+        <th>Akcje</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% latestEntries.forEach((entry) => { %>
+      <tr>
+        <td><%= entry.process_name %></td>
+        <td>
+          <span class="badge badge--<%= String(entry.status || '').toLowerCase() %>">
+            <%= entry.status %>
+          </span>
+        </td>
+        <td><%= entry.created_by_name %></td>
+        <td><%= entry.created_at %></td>
+        <td>
+          <a class="btn" href="/manager/haccp/entries/<%= entry.id %>">Szczegoly</a>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<section class="card">
+  <div class="section-head">
+    <h2>Otwarte alerty</h2>
+    <a class="btn" href="/manager/haccp/alerts?resolved=0">Pelna lista</a>
+  </div>
+
+  <% if (latestAlerts.length === 0) { %>
+  <p>Brak otwartych alertow.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Priorytet</th>
+        <th>Proces</th>
+        <th>Tresc</th>
+        <th>Data</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% latestAlerts.forEach((alert) => { %>
+      <tr>
+        <td>
+          <span class="badge badge--severity-<%= String(alert.severity || '').toLowerCase() %>">
+            <%= alert.severity %>
+          </span>
+        </td>
+        <td><%= alert.process_name || "-" %></td>
+        <td><%= alert.message %></td>
+        <td><%= alert.created_at %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

@@ -6,19 +6,6 @@
 
   <form class="form-stack" method="POST" action="/register">
     <label>
-      Nazwa uzytkownika
-      <input
-        type="text"
-        name="username"
-        value="<%= formData?.username || '' %>"
-        required
-        minlength="3"
-        maxlength="40"
-        autocomplete="username"
-      />
-    </label>
-
-    <label>
       Email
       <input
         type="email"
@@ -30,11 +17,13 @@
     </label>
 
     <label>
-      Imie i nazwisko (opcjonalnie)
+      Imie i nazwisko
       <input
         type="text"
         name="name"
         value="<%= formData?.name || '' %>"
+        required
+        maxlength="120"
         autocomplete="name"
       />
     </label>

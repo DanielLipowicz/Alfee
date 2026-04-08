@@ -289,6 +289,9 @@ button {
 input[type="text"],
 input[type="email"],
 input[type="password"],
+input[type="date"],
+input[type="number"],
+textarea,
 select {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -326,6 +329,60 @@ select {
   color: #234f96;
 }
 
+.badge--ok {
+  background: #e7f8ee;
+  color: #166736;
+}
+
+.badge--alert {
+  background: #fff7e2;
+  color: #8a6113;
+}
+
+.badge--critical {
+  background: #ffe9e9;
+  color: #892a2a;
+}
+
+.badge--severity-low {
+  background: #eaf1ff;
+  color: #234f96;
+}
+
+.badge--severity-medium {
+  background: #fff7e2;
+  color: #8a6113;
+}
+
+.badge--severity-high {
+  background: #ffe9e9;
+  color: #892a2a;
+}
+
+.haccp-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.haccp-grid-3 {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.haccp-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 0.8rem;
+}
+
+.haccp-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
 .steps {
   margin: 0;
   padding-left: 1.15rem;
@@ -342,8 +399,137 @@ select {
   gap: 0.8rem;
 }
 
+.task-steps-card__head {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.task-steps-card__head h2 {
+  margin: 0;
+}
+
+.steps-progress {
+  margin-bottom: 1rem;
+}
+
+.steps-progress__label {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 0.35rem;
+}
+
+.steps-progress__track {
+  width: 100%;
+  height: 9px;
+  background: #e6edf8;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.steps-progress__value {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #0b63f6, #2ca66c);
+  transition: width 0.25s ease;
+}
+
+.steps--cards {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.steps--cards .step-item {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.steps--cards .step-item--completed {
+  background: #f3fbf6;
+  border-color: #c3ebd1;
+}
+
+.step-index {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.step-text {
+  margin: 0.55rem 0 0.9rem;
+  line-height: 1.45;
+}
+
+.step-actions {
+  display: grid;
+  grid-template-columns: minmax(200px, auto) minmax(230px, 1fr);
+  gap: 0.8rem;
+  align-items: end;
+}
+
+.step-actions form {
+  margin: 0;
+}
+
+.step-evidence-form {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.step-upload-label {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.step-evidence-input {
+  width: 100%;
+  border: 1px dashed #9fb5d8;
+  border-radius: 10px;
+  padding: 0.35rem 0.55rem;
+  background: #fff;
+}
+
+.step-evidence-input:disabled {
+  background: #f3f6fb;
+  color: #8a96a9;
+  cursor: not-allowed;
+  border-style: solid;
+}
+
+.step-hint {
+  margin: 0.55rem 0 0.25rem;
+  font-size: 0.88rem;
+}
+
 .muted {
   color: var(--muted);
+}
+
+.step-feedback {
+  margin: 0.1rem 0 0.35rem;
+  min-height: 1.2rem;
+  font-size: 0.9rem;
+}
+
+.step-feedback--success {
+  color: #155d34;
+}
+
+.step-feedback--error {
+  color: #7b1c1c;
+}
+
+.step-feedback--pending {
+  color: #234f96;
 }
 
 .hint {
@@ -380,6 +566,28 @@ select {
   margin-top: 0.3rem;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.task-steps-card .evidence-item {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.45rem;
+  background: #fff;
+}
+
+.task-steps-card .evidence-item figcaption {
+  margin-top: 0.4rem;
+}
+
+.evidence-actions {
+  margin-top: 0.4rem;
+}
+
+.task-steps-card .evidence-actions .btn {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
 }
 
 .notification-list {
@@ -433,5 +641,9 @@ select {
 
   .step-row {
     flex-direction: column;
+  }
+
+  .step-actions {
+    grid-template-columns: 1fr;
   }
 }

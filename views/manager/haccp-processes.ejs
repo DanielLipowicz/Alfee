@@ -1,0 +1,62 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <div class="section-head">
+    <h1>Procesy HACCP</h1>
+    <div class="actions">
+      <a class="btn btn--primary" href="/manager/haccp/processes/new">Nowy proces</a>
+      <a class="btn" href="/manager/haccp">Dashboard</a>
+    </div>
+  </div>
+
+  <% if (processes.length === 0) { %>
+  <p>Brak zdefiniowanych procesow HACCP.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Nazwa</th>
+        <th>CCP</th>
+        <th>Aktywny</th>
+        <th>Czestotliwosc</th>
+        <th>Pola</th>
+        <th>Wpisy</th>
+        <th>Akcje</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% processes.forEach((process) => { %>
+      <tr>
+        <td>
+          <strong><%= process.name %></strong>
+          <% if (process.description) { %>
+          <div class="muted"><%= process.description %></div>
+          <% } %>
+        </td>
+        <td>
+          <span class="badge <%= Number(process.is_ccp) === 1 ? 'badge--critical' : 'badge--ok' %>">
+            <%= Number(process.is_ccp) === 1 ? "TAK" : "NIE" %>
+          </span>
+        </td>
+        <td><%= Number(process.is_active) === 1 ? "TAK" : "NIE" %></td>
+        <td>
+          <%= process.frequency_type %>
+          <% if (process.frequency_value != null) { %>
+            (<%= process.frequency_value %>)
+          <% } %>
+        </td>
+        <td><%= process.field_count %></td>
+        <td><%= process.entry_count %></td>
+        <td>
+          <div class="actions">
+            <a class="btn" href="/manager/haccp/processes/<%= process.id %>/edit">Edytuj</a>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

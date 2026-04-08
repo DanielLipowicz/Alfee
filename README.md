@@ -22,8 +22,8 @@ Aplikacja webowa z trzema rolami:
 
 ## Autoryzacja
 
-- Rejestracja lokalna: `nazwa uzytkownika + email + haslo` (konto domyslnie aktywne).
-- Logowanie lokalne: `nazwa uzytkownika lub email + haslo`.
+- Rejestracja lokalna: `email + imie i nazwisko + haslo` (konto domyslnie aktywne).
+- Logowanie lokalne: `email + haslo`.
 - Hasla sa haszowane algorytmem `scrypt`.
 - Po wielu nieudanych probach logowania konto jest czasowo blokowane.
 - Logowanie Google OAuth 2.0 (opcjonalnie, jesli skonfigurowane w `.env`).

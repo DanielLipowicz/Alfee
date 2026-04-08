@@ -12,6 +12,67 @@ const router = express.Router();
 
 router.use(ensureAuthenticated, ensureEmployee);
 
+async function refreshUnreadNotificationsCount(userId, res) {
+  const unread = await db.get(
+    "SELECT COUNT(*) AS total FROM notifications WHERE user_id = ? AND is_read = 0",
+    [userId]
+  );
+  res.locals.unreadNotifications = Number(unread?.total || 0);
+}
+
+function expectsJson(req) {
+  const acceptHeader = req.get("accept") || "";
+  return acceptHeader.includes("application/json");
+}
+
+function renderTaskError(req, res, statusCode, title, message) {
+  if (expectsJson(req)) {
+    return res.status(statusCode).json({
+      ok: false,
+      error: message,
+    });
+  }
+
+  return res.status(statusCode).render("error", {
+    title,
+    message,
+  });
+}
+
+function resolveUploadPath(imagePath) {
+  if (typeof imagePath !== "string" || !imagePath.startsWith("/uploads/")) {
+    return null;
+  }
+
+  const filename = path.basename(imagePath);
+  if (!filename || filename === "." || filename === "/") {
+    return null;
+  }
+
+  return path.join(process.cwd(), "uploads", filename);
+}
+
+function removeUploadedFile(imagePath) {
+  const fullPath = resolveUploadPath(imagePath);
+  if (!fullPath) {
+    return;
+  }
+
+  fs.rmSync(fullPath, { force: true });
+}
+
+function removeUploadedFilesByNames(fileList) {
+  if (!Array.isArray(fileList)) {
+    return;
+  }
+
+  fileList.forEach((file) => {
+    if (file?.filename) {
+      removeUploadedFile(`/uploads/${file.filename}`);
+    }
+  });
+}
+
 async function updateAssignmentStatus(assignmentId) {
   const [assignment, summary] = await Promise.all([
     db.get(
@@ -49,6 +110,7 @@ async function updateAssignmentStatus(assignmentId) {
   const done = Number(summary.done || 0);
   const total = Number(summary.total || 0);
   const status = total > 0 && done === total ? "completed" : "in_progress";
+  const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
 
   await db.run("UPDATE assignments SET status = ? WHERE id = ?", [
     status,
@@ -63,6 +125,9 @@ async function updateAssignmentStatus(assignmentId) {
     employeeName: assignment.employee_name,
     taskTitle: assignment.task_title,
     completedAt: summary.completed_at || null,
+    completedSteps: done,
+    totalSteps: total,
+    percentage,
   };
 }
 
@@ -153,6 +218,7 @@ router.get("/tasks/:assignmentId", async (req, res, next) => {
       `,
       [req.user.id, `/employee/tasks/${assignment.id}`]
     );
+    await refreshUnreadNotificationsCount(req.user.id, res);
 
     const evidence = await db.all(
       `
@@ -179,7 +245,8 @@ router.get("/tasks/:assignmentId", async (req, res, next) => {
 
     const progress = withProgress([
       {
-        completed_steps: steps.filter((step) => step.completed === 1).length,
+        completed_steps: steps.filter((step) => Number(step.completed) === 1)
+          .length,
         total_steps: steps.length,
       },
     ])[0];
@@ -216,13 +283,17 @@ router.post(
       );
 
       if (!step) {
-        return res.status(404).render("error", {
-          title: "Brak czynnosci",
-          message: "Nie znaleziono wskazanej czynnosci.",
-        });
+        return renderTaskError(
+          req,
+          res,
+          404,
+          "Brak czynnosci",
+          "Nie znaleziono wskazanej czynnosci."
+        );
       }
 
-      const targetCompleted = step.completed === 1 ? 0 : 1;
+      const isCompleted = Number(step.completed) === 1;
+      const targetCompleted = isCompleted ? 0 : 1;
       await db.run(
         `
         UPDATE assignment_steps
@@ -257,6 +328,27 @@ router.post(
         );
       }
 
+      if (expectsJson(req)) {
+        return res.json({
+          ok: true,
+          message: "Zaktualizowano status czynnosci.",
+          step: {
+            id: step.id,
+            completed: targetCompleted,
+          },
+          assignment: assignmentUpdate
+            ? {
+                status: assignmentUpdate.status,
+                progress: {
+                  completed_steps: assignmentUpdate.completedSteps,
+                  total_steps: assignmentUpdate.totalSteps,
+                  percentage: assignmentUpdate.percentage,
+                },
+              }
+            : null,
+        });
+      }
+
       setFlash(req, "success", "Zaktualizowano status czynnosci.");
       return res.redirect(`/employee/tasks/${req.params.assignmentId}`);
     } catch (error) {
@@ -268,8 +360,16 @@ router.post(
 router.post(
   "/tasks/:assignmentId/steps/:stepId/evidence",
   (req, res, next) => {
-    uploadEvidence.single("evidenceImage")(req, res, (error) => {
+    uploadEvidence.array("evidenceImage", 10)(req, res, (error) => {
       if (error) {
+        if (expectsJson(req)) {
+          res.status(400).json({
+            ok: false,
+            error: error.message || "Nie udalo sie dodac zdjecia.",
+          });
+          return;
+        }
+
         setFlash(req, "error", error.message || "Nie udalo sie dodac zdjecia.");
         res.redirect(`/employee/tasks/${req.params.assignmentId}`);
         return;
@@ -279,8 +379,15 @@ router.post(
   },
   async (req, res, next) => {
     try {
-      if (!req.file) {
-        setFlash(req, "error", "Wybierz plik graficzny do wyslania.");
+      if (!Array.isArray(req.files) || req.files.length === 0) {
+        if (expectsJson(req)) {
+          return res.status(400).json({
+            ok: false,
+            error: "Wybierz co najmniej jedno zdjecie do wyslania.",
+          });
+        }
+
+        setFlash(req, "error", "Wybierz co najmniej jedno zdjecie do wyslania.");
         return res.redirect(`/employee/tasks/${req.params.assignmentId}`);
       }
 
@@ -300,31 +407,127 @@ router.post(
       );
 
       if (!step) {
-        const fullPath = path.join(process.cwd(), "uploads", req.file.filename);
-        fs.rmSync(fullPath, { force: true });
-        return res.status(404).render("error", {
-          title: "Brak czynnosci",
-          message: "Nie znaleziono wskazanej czynnosci.",
+        removeUploadedFilesByNames(req.files);
+        return renderTaskError(
+          req,
+          res,
+          404,
+          "Brak czynnosci",
+          "Nie znaleziono wskazanej czynnosci."
+        );
+      }
+
+      const evidenceItems = [];
+      for (const file of req.files) {
+        const insertedEvidence = await db.run(
+          "INSERT INTO step_evidence (assignment_step_id, image_path) VALUES (?, ?)",
+          [step.id, `/uploads/${file.filename}`]
+        );
+
+        const evidence = await db.get(
+          `
+          SELECT
+            e.id,
+            e.assignment_step_id,
+            e.image_path,
+            e.uploaded_at
+          FROM step_evidence e
+          WHERE e.id = ?
+          `,
+          [insertedEvidence.lastID]
+        );
+        if (evidence) {
+          evidenceItems.push(evidence);
+        }
+      }
+
+      if (expectsJson(req)) {
+        const count = evidenceItems.length;
+        return res.json({
+          ok: true,
+          message:
+            count === 1
+              ? "Dodano 1 zdjecie jako dowod wykonania."
+              : `Dodano ${count} zdjec jako dowod wykonania.`,
+          evidenceItems,
         });
       }
 
-      if (step.completed !== 1) {
-        const fullPath = path.join(process.cwd(), "uploads", req.file.filename);
-        fs.rmSync(fullPath, { force: true });
+      if (evidenceItems.length === 1) {
+        setFlash(req, "success", "Dodano 1 zdjecie jako dowod wykonania.");
+      } else {
         setFlash(
           req,
-          "error",
-          "Najpierw oznacz czynnosc jako ukonczona, a dopiero potem dodaj dowod."
+          "success",
+          `Dodano ${evidenceItems.length} zdjec jako dowod wykonania.`
         );
-        return res.redirect(`/employee/tasks/${req.params.assignmentId}`);
       }
+      return res.redirect(`/employee/tasks/${req.params.assignmentId}`);
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
 
-      await db.run(
-        "INSERT INTO step_evidence (assignment_step_id, image_path) VALUES (?, ?)",
-        [step.id, `/uploads/${req.file.filename}`]
+router.post(
+  "/tasks/:assignmentId/steps/:stepId/evidence/:evidenceId/delete",
+  async (req, res, next) => {
+    try {
+      const evidence = await db.get(
+        `
+        SELECT
+          e.id,
+          e.image_path
+        FROM step_evidence e
+        JOIN assignment_steps s ON s.id = e.assignment_step_id
+        JOIN assignments a ON a.id = s.assignment_id
+        JOIN tasks t ON t.id = a.task_id
+        JOIN user_organizations uo
+          ON uo.organization_id = t.organization_id AND uo.user_id = a.employee_id
+        WHERE
+          e.id = ?
+          AND e.assignment_step_id = ?
+          AND s.assignment_id = ?
+          AND a.employee_id = ?
+        `,
+        [
+          req.params.evidenceId,
+          req.params.stepId,
+          req.params.assignmentId,
+          req.user.id,
+        ]
       );
 
-      setFlash(req, "success", "Dodano zdjecie jako dowod wykonania.");
+      if (!evidence) {
+        return renderTaskError(
+          req,
+          res,
+          404,
+          "Brak zdjecia",
+          "Nie znaleziono wskazanego zdjecia."
+        );
+      }
+
+      await db.run("DELETE FROM step_evidence WHERE id = ?", [evidence.id]);
+
+      const referenceCount = await db.get(
+        "SELECT COUNT(*) AS total FROM step_evidence WHERE image_path = ?",
+        [evidence.image_path]
+      );
+
+      if (Number(referenceCount?.total || 0) === 0) {
+        removeUploadedFile(evidence.image_path);
+      }
+
+      if (expectsJson(req)) {
+        return res.json({
+          ok: true,
+          message: "Usunieto zdjecie.",
+          evidenceId: Number(evidence.id),
+        });
+      }
+
+      setFlash(req, "success", "Usunieto zdjecie.");
       return res.redirect(`/employee/tasks/${req.params.assignmentId}`);
     } catch (error) {
       return next(error);

@@ -2,17 +2,17 @@
 
 <section class="card narrow">
   <h1>Logowanie</h1>
-  <p>Zaloguj sie po nazwie uzytkownika lub emailu i hasle.</p>
+  <p>Zaloguj sie emailem i haslem.</p>
 
   <form class="form-stack" method="POST" action="/login/local">
     <label>
-      Nazwa uzytkownika lub email
+      Email
       <input
-        type="text"
-        name="identifier"
-        value="<%= formData?.identifier || '' %>"
+        type="email"
+        name="email"
+        value="<%= formData?.email || '' %>"
         required
-        autocomplete="username"
+        autocomplete="email"
       />
     </label>
 

@@ -1,0 +1,157 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <div class="section-head">
+    <h1>Wpisy i raporty HACCP</h1>
+    <a class="btn" href="/manager/haccp">Dashboard</a>
+  </div>
+
+  <form class="form-inline" method="GET" action="/manager/haccp/reports">
+    <label>
+      Data od
+      <input type="date" name="dateFrom" value="<%= filters.dateFrom || '' %>" />
+    </label>
+    <label>
+      Data do
+      <input type="date" name="dateTo" value="<%= filters.dateTo || '' %>" />
+    </label>
+    <label>
+      Status
+      <select name="status">
+        <option value="">Wszystkie</option>
+        <% statuses.forEach((status) => { %>
+        <option value="<%= status %>" <%= filters.status === status ? "selected" : "" %>>
+          <%= status %>
+        </option>
+        <% }) %>
+      </select>
+    </label>
+    <label>
+      Proces
+      <select name="processId">
+        <option value="">Wszystkie</option>
+        <% processes.forEach((process) => { %>
+        <option
+          value="<%= process.id %>"
+          <%= Number(filters.processId) === Number(process.id) ? "selected" : "" %>
+        >
+          <%= process.name %>
+        </option>
+        <% }) %>
+      </select>
+    </label>
+    <label>
+      Pracownik
+      <select name="createdBy">
+        <option value="">Wszyscy</option>
+        <% employees.forEach((employee) => { %>
+        <option
+          value="<%= employee.id %>"
+          <%= Number(filters.createdBy) === Number(employee.id) ? "selected" : "" %>
+        >
+          <%= employee.name %> (<%= employee.email %>)
+        </option>
+        <% }) %>
+      </select>
+    </label>
+    <button class="btn btn--primary" type="submit">Generuj</button>
+    <a class="btn" href="/manager/haccp/reports">Reset</a>
+  </form>
+
+  <div class="actions">
+    <a
+      class="btn"
+      href="/manager/haccp/reports/export.csv?dateFrom=<%= encodeURIComponent(filters.dateFrom || '') %>&dateTo=<%= encodeURIComponent(filters.dateTo || '') %>&status=<%= encodeURIComponent(filters.status || '') %>&processId=<%= encodeURIComponent(filters.processId || '') %>&createdBy=<%= encodeURIComponent(filters.createdBy || '') %>"
+    >
+      Eksport CSV
+    </a>
+    <a
+      class="btn"
+      href="/manager/haccp/reports/export.pdf?dateFrom=<%= encodeURIComponent(filters.dateFrom || '') %>&dateTo=<%= encodeURIComponent(filters.dateTo || '') %>&status=<%= encodeURIComponent(filters.status || '') %>&processId=<%= encodeURIComponent(filters.processId || '') %>&createdBy=<%= encodeURIComponent(filters.createdBy || '') %>"
+    >
+      Eksport PDF
+    </a>
+  </div>
+</section>
+
+<%
+  const totalRows = reportGroups.reduce((sum, group) => sum + group.rows.length, 0);
+%>
+<section class="card">
+  <h2>Wynik (<%= totalRows %> wpisow)</h2>
+  <% if (reportGroups.length === 0) { %>
+  <p>Brak danych dla podanych filtrow.</p>
+  <% } else { %>
+  <% reportGroups.forEach((group) => { %>
+  <article class="tenant-card">
+    <h3>
+      <%= group.processName %> (<%= group.rows.length %>)
+      <% if (group.isCcp) { %>
+      <span class="badge badge--critical">CCP</span>
+      <% } %>
+    </h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Autor</th>
+          <th>Data</th>
+          <th>Review</th>
+          <th>Dzialania korygujace</th>
+          <% group.fields.forEach((field) => { %>
+          <th><%= field.name %></th>
+          <% }) %>
+          <th>Akcje</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% group.rows.forEach((row) => { %>
+        <tr>
+          <td><%= row.id %></td>
+          <td>
+            <span class="badge badge--<%= String(row.status || '').toLowerCase() %>">
+              <%= row.status %>
+            </span>
+          </td>
+          <td><%= row.created_by_name %></td>
+          <td><%= row.created_at %></td>
+          <td>
+            <%= Number(row.is_reviewed) === 1 ? "TAK" : "NIE" %>
+            <% if (Number(row.is_reviewed) === 1) { %>
+            <div class="muted"><%= row.reviewed_by_name || "-" %> / <%= row.reviewed_at || "-" %></div>
+            <% } %>
+          </td>
+          <td><%= row.corrective_action_text || "-" %></td>
+          <% group.fields.forEach((field) => { %>
+          <td>
+            <% const value = row.fieldValues[field.id]; %>
+            <% if (value == null || String(value) === "") { %>
+            -
+            <% } else if (String(field.type || '').toUpperCase() === 'BOOLEAN') { %>
+            <%= ['1', 'true', 'yes', 'on', 'tak'].includes(String(value).toLowerCase()) ? 'TAK' : 'NIE' %>
+            <% } else { %>
+            <%= value %>
+            <% } %>
+          </td>
+          <% }) %>
+          <td>
+            <div class="actions">
+              <a class="btn" href="<%= row.detailsUrl %>">Szczegoly</a>
+              <% if (Number(row.is_reviewed) !== 1) { %>
+              <form method="POST" action="/manager/haccp/entries/<%= row.id %>/review">
+                <button class="btn btn--primary" type="submit">Zatwierdz</button>
+              </form>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </article>
+  <% }) %>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

@@ -16,6 +16,7 @@
             <% if (isAdminManagerMode) { %>
             <a href="/manager/dashboard">Panel kierownika</a>
             <a href="/manager/tasks">Zadania</a>
+            <a href="/manager/haccp">HACCP</a>
             <a href="/manager/employees/new">Nowy pracownik</a>
             <a href="/manager/assignments">Postep</a>
             <% } %>
@@ -31,6 +32,7 @@
             <% } else if (currentUser && currentUser.role === "manager") { %>
             <a href="/manager/dashboard">Panel</a>
             <a href="/manager/tasks">Zadania</a>
+            <a href="/manager/haccp">HACCP</a>
             <a href="/manager/employees/new">Nowy pracownik</a>
             <a href="/manager/assignments">Postep</a>
             <a href="/profile">Profil</a>
@@ -43,6 +45,7 @@
             <a href="/logout">Wyloguj</a>
             <% } else if (currentUser && currentUser.role === "employee") { %>
             <a href="/employee/tasks">Moje zadania</a>
+            <a href="/employee/haccp">HACCP</a>
             <a href="/profile">Profil</a>
             <a href="/notifications">
               Powiadomienia

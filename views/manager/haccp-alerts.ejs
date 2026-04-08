@@ -1,0 +1,76 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <div class="section-head">
+    <h1>Alerty HACCP</h1>
+    <a class="btn" href="/manager/haccp">Dashboard</a>
+  </div>
+
+  <form class="form-inline" method="GET" action="/manager/haccp/alerts">
+    <label>
+      Status
+      <select name="resolved">
+        <option value="" <%= filters.resolved == null ? "selected" : "" %>>Wszystkie</option>
+        <option value="0" <%= Number(filters.resolved) === 0 ? "selected" : "" %>>Otwarte</option>
+        <option value="1" <%= Number(filters.resolved) === 1 ? "selected" : "" %>>Rozwiazane</option>
+      </select>
+    </label>
+    <button class="btn btn--primary" type="submit">Filtruj</button>
+    <a class="btn" href="/manager/haccp/alerts">Reset</a>
+  </form>
+</section>
+
+<section class="card">
+  <% if (alerts.length === 0) { %>
+  <p>Brak alertow.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Priorytet</th>
+        <th>Typ</th>
+        <th>Proces</th>
+        <th>Wpis</th>
+        <th>Tresc</th>
+        <th>Data</th>
+        <th>Status</th>
+        <th>Akcja</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% alerts.forEach((alert) => { %>
+      <tr>
+        <td>
+          <span class="badge badge--severity-<%= String(alert.severity || '').toLowerCase() %>">
+            <%= alert.severity %>
+          </span>
+        </td>
+        <td><%= alert.alert_type %></td>
+        <td><%= alert.process_name || "-" %></td>
+        <td>
+          <% if (alert.entry_id) { %>
+          <a href="/manager/haccp/entries/<%= alert.entry_id %>">#<%= alert.entry_id %></a>
+          <% } else { %>
+          -
+          <% } %>
+        </td>
+        <td><%= alert.message %></td>
+        <td><%= alert.created_at %></td>
+        <td><%= Number(alert.resolved) === 1 ? `Rozwiazany (${alert.resolved_at || "-"})` : "Otwarty" %></td>
+        <td>
+          <% if (Number(alert.resolved) !== 1) { %>
+          <form method="POST" action="/manager/haccp/alerts/<%= alert.id %>/resolve">
+            <button class="btn btn--primary" type="submit">Zamknij</button>
+          </form>
+          <% } else { %>
+          -
+          <% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

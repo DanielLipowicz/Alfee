@@ -1,0 +1,89 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card narrow">
+  <div class="section-head">
+    <h1>Nowy wpis HACCP</h1>
+    <a class="btn" href="/employee/haccp">Powrot</a>
+  </div>
+
+  <p class="muted">
+    Proces: <strong><%= process.name %></strong>
+    <% if (Number(process.is_ccp) === 1) { %>
+    <span class="badge badge--critical">CCP</span>
+    <% } %>
+  </p>
+  <% if (process.description) { %>
+  <p class="muted"><%= process.description %></p>
+  <% } %>
+
+  <% if (errors && errors.length > 0) { %>
+  <div class="flash flash--error">
+    <% errors.forEach((error) => { %>
+    <div><%= error %></div>
+    <% }) %>
+  </div>
+  <% } %>
+
+  <form method="POST" action="/employee/haccp/processes/<%= process.id %>/entries" class="form-stack">
+    <% process.fields.forEach((field) => { %>
+    <% const inputName = `field_${field.id}`; %>
+    <% const previousValue = previousValues[inputName] == null ? "" : previousValues[inputName]; %>
+
+    <label>
+      <%= field.name %>
+      <% if (Number(field.required) === 1) { %>
+      <span class="muted">(wymagane)</span>
+      <% } %>
+
+      <% if (field.type === "TEXT") { %>
+      <input
+        type="text"
+        name="<%= inputName %>"
+        value="<%= previousValue %>"
+        <%= Number(field.required) === 1 ? "required" : "" %>
+      />
+      <% } else if (field.type === "NUMBER") { %>
+      <input
+        type="text"
+        name="<%= inputName %>"
+        value="<%= previousValue %>"
+        <%= Number(field.required) === 1 ? "required" : "" %>
+      />
+      <span class="muted">
+        Zakres:
+        <%= field.min_value == null ? "-inf" : field.min_value %>
+        do
+        <%= field.max_value == null ? "+inf" : field.max_value %>
+      </span>
+      <% } else if (field.type === "BOOLEAN") { %>
+      <select name="<%= inputName %>" <%= Number(field.required) === 1 ? "required" : "" %>>
+        <option value="" <%= previousValue === "" ? "selected" : "" %>>Wybierz</option>
+        <option value="1" <%= String(previousValue) === "1" ? "selected" : "" %>>TAK</option>
+        <option value="0" <%= String(previousValue) === "0" ? "selected" : "" %>>NIE</option>
+      </select>
+      <% } else if (field.type === "SELECT") { %>
+      <select name="<%= inputName %>" <%= Number(field.required) === 1 ? "required" : "" %>>
+        <option value="">Wybierz</option>
+        <% field.allowed_values.forEach((option) => { %>
+        <option value="<%= option %>" <%= String(previousValue) === String(option) ? "selected" : "" %>>
+          <%= option %>
+        </option>
+        <% }) %>
+      </select>
+      <% } %>
+    </label>
+    <% }) %>
+
+    <label>
+      Dzialanie korygujace (wymagane dla ALERT/CRITICAL)
+      <textarea name="correctiveAction" rows="4"><%= correctiveAction || "" %></textarea>
+    </label>
+
+    <div class="actions">
+      <button class="btn btn--primary" type="submit">Zapisz wpis</button>
+      <a class="btn" href="/employee/haccp">Anuluj</a>
+    </div>
+  </form>
+</section>
+
+<%- include("../partials/bottom") %>

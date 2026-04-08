@@ -1,0 +1,113 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <div class="section-head">
+    <h1>Wpis HACCP #<%= details.entry.id %></h1>
+    <a class="btn" href="/manager/haccp/reports">Powrot</a>
+  </div>
+
+  <div class="grid haccp-grid-2">
+    <article class="tenant-card">
+      <h2>Metryka</h2>
+      <p><strong>Proces:</strong> <%= details.entry.process_name %></p>
+      <p><strong>Status:</strong> <span class="badge badge--<%= String(details.entry.status || '').toLowerCase() %>"><%= details.entry.status %></span></p>
+      <p><strong>Autor:</strong> <%= details.entry.created_by_name %></p>
+      <p><strong>Data:</strong> <%= details.entry.created_at %></p>
+      <p><strong>CCP:</strong> <%= Number(details.entry.is_ccp) === 1 ? "TAK" : "NIE" %></p>
+      <p>
+        <strong>Review:</strong>
+        <%= Number(details.entry.is_reviewed) === 1 ? "TAK" : "NIE" %>
+        <% if (Number(details.entry.is_reviewed) === 1) { %>
+        (<%= details.entry.reviewed_by_name || "-" %>, <%= details.entry.reviewed_at %>)
+        <% } %>
+      </p>
+    </article>
+
+    <article class="tenant-card">
+      <h2>Akcje</h2>
+      <% if (Number(details.entry.is_reviewed) === 1) { %>
+      <p>Wpis zostal juz zatwierdzony.</p>
+      <% } else { %>
+      <form method="POST" action="/manager/haccp/entries/<%= details.entry.id %>/review">
+        <button class="btn btn--primary" type="submit">Zatwierdz wpis</button>
+      </form>
+      <% } %>
+    </article>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Wartosci formularza</h2>
+  <% if (details.values.length === 0) { %>
+  <p>Brak wartosci.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Pole</th>
+        <th>Typ</th>
+        <th>Wartosc</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% details.values.forEach((value) => { %>
+      <tr>
+        <td><%= value.field_name %></td>
+        <td><%= value.field_type %></td>
+        <td><%= value.value == null ? "-" : value.value %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<section class="card">
+  <h2>Dzialania korygujace</h2>
+  <% if (details.correctiveActions.length === 0) { %>
+  <p>Brak dzialan korygujacych.</p>
+  <% } else { %>
+  <ul class="haccp-list">
+    <% details.correctiveActions.forEach((action) => { %>
+    <li>
+      <strong><%= action.created_at %>:</strong>
+      <%= action.description %>
+    </li>
+    <% }) %>
+  </ul>
+  <% } %>
+</section>
+
+<section class="card">
+  <h2>Alerty powiazane</h2>
+  <% if (details.alerts.length === 0) { %>
+  <p>Brak alertow.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Priorytet</th>
+        <th>Tresc</th>
+        <th>Data</th>
+        <th>Rozwiazany</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% details.alerts.forEach((alert) => { %>
+      <tr>
+        <td>
+          <span class="badge badge--severity-<%= String(alert.severity || '').toLowerCase() %>">
+            <%= alert.severity %>
+          </span>
+        </td>
+        <td><%= alert.message %></td>
+        <td><%= alert.created_at %></td>
+        <td><%= Number(alert.resolved) === 1 ? `TAK (${alert.resolved_at || "-"})` : "NIE" %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

@@ -9,6 +9,10 @@ const router = express.Router();
 
 router.use(ensureAuthenticated);
 
+function normalizeDisplayName(rawName) {
+  return String(rawName || "").trim();
+}
+
 function validatePasswordStrength(password) {
   const value = String(password || "");
   if (value.length < 10) {
@@ -34,7 +38,6 @@ async function loadProfileUser(userId) {
     `
     SELECT
       id,
-      username,
       email,
       name,
       role,
@@ -69,6 +72,48 @@ router.get("/", async (req, res, next) => {
     }
 
     return renderProfile(res, profileUser);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/name", async (req, res, next) => {
+  try {
+    const name = normalizeDisplayName(req.body.name);
+    const profileUser = await loadProfileUser(req.user.id);
+
+    if (!profileUser) {
+      return res.status(404).render("error", {
+        title: "Brak uzytkownika",
+        message: "Nie znaleziono danych profilu.",
+      });
+    }
+
+    if (!name) {
+      return renderProfile(res, profileUser, 400, {
+        type: "error",
+        text: "Podaj imie i nazwisko.",
+      });
+    }
+
+    if (name.length > 120) {
+      return renderProfile(res, profileUser, 400, {
+        type: "error",
+        text: "Imie i nazwisko moze miec maksymalnie 120 znakow.",
+      });
+    }
+
+    if (profileUser.name === name) {
+      return renderProfile(res, profileUser, 400, {
+        type: "error",
+        text: "Podane imie i nazwisko jest juz ustawione na koncie.",
+      });
+    }
+
+    await db.run("UPDATE users SET name = ? WHERE id = ?", [name, profileUser.id]);
+
+    setFlash(req, "success", "Imie i nazwisko zostalo zaktualizowane.");
+    return res.redirect("/profile");
   } catch (error) {
     return next(error);
   }

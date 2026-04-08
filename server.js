@@ -12,6 +12,8 @@ const { db, initDatabase } = require("./src/database");
 const adminRoutes = require("./src/routes/adminRoutes");
 const managerRoutes = require("./src/routes/managerRoutes");
 const employeeRoutes = require("./src/routes/employeeRoutes");
+const haccpManagerRoutes = require("./src/routes/haccpManagerRoutes");
+const haccpEmployeeRoutes = require("./src/routes/haccpEmployeeRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const profileRoutes = require("./src/routes/profileRoutes");
 const { ensureAuthenticated } = require("./src/middleware/auth");
@@ -110,20 +112,8 @@ function normalizeEmail(rawEmail) {
   return String(rawEmail || "").trim().toLowerCase();
 }
 
-function normalizeText(rawValue) {
-  return String(rawValue || "").trim();
-}
-
-function normalizeUsername(rawUsername) {
-  return normalizeText(rawUsername);
-}
-
 function validateEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function validateUsername(username) {
-  return /^[a-zA-Z0-9._-]{3,40}$/.test(username);
 }
 
 function validatePasswordStrength(password) {
@@ -146,8 +136,8 @@ function validatePasswordStrength(password) {
   return null;
 }
 
-function buildLocalIdentity(username) {
-  return `local:${username}:${Date.now()}:${Math.round(Math.random() * 1e9)}`;
+function buildLocalIdentity(email) {
+  return `local:${email}:${Date.now()}:${Math.round(Math.random() * 1e9)}`;
 }
 
 function renderAuthError(res, statusCode, viewName, formData, message) {
@@ -417,23 +407,23 @@ app.get("/login", (req, res) => {
   return res.render("login", {
     title: "Logowanie",
     formData: {
-      identifier: "",
+      email: "",
     },
   });
 });
 
 app.post("/login/local", async (req, res, next) => {
   try {
-    const identifier = normalizeText(req.body.identifier).toLowerCase();
+    const email = normalizeEmail(req.body.email);
     const password = String(req.body.password || "");
 
-    if (!identifier || !password) {
+    if (!email || !password) {
       return renderAuthError(
         res,
         400,
         "login",
-        { identifier },
-        "Podaj nazwe uzytkownika lub email oraz haslo."
+        { email },
+        "Podaj email oraz haslo."
       );
     }
 
@@ -441,10 +431,10 @@ app.post("/login/local", async (req, res, next) => {
       `
       SELECT *
       FROM users
-      WHERE auth_provider = 'local' AND (lower(username) = lower(?) OR lower(email) = lower(?))
+      WHERE auth_provider = 'local' AND lower(email) = lower(?)
       LIMIT 1
       `,
-      [identifier, identifier]
+      [email]
     );
 
     if (!user) {
@@ -452,7 +442,7 @@ app.post("/login/local", async (req, res, next) => {
         res,
         401,
         "login",
-        { identifier },
+        { email },
         "Niepoprawne dane logowania."
       );
     }
@@ -462,7 +452,7 @@ app.post("/login/local", async (req, res, next) => {
         res,
         403,
         "login",
-        { identifier },
+        { email },
         "To konto jest nieaktywne."
       );
     }
@@ -472,7 +462,7 @@ app.post("/login/local", async (req, res, next) => {
         res,
         423,
         "login",
-        { identifier },
+        { email },
         `Konto jest czasowo zablokowane po wielu nieudanych probach. Sprobuj ponownie za ${LOCKOUT_MINUTES} minut.`
       );
     }
@@ -491,7 +481,7 @@ app.post("/login/local", async (req, res, next) => {
         res,
         403,
         "login",
-        { identifier },
+        { email },
         "To konto nie ma ustawionego hasla. Zarejestruj nowe konto lokalne lub zaloguj sie przez Google."
       );
     }
@@ -508,11 +498,11 @@ app.post("/login/local", async (req, res, next) => {
           res,
           423,
           "login",
-          { identifier },
+          { email },
           `Konto zostalo zablokowane na ${LOCKOUT_MINUTES} minut po wielu nieudanych probach.`
         );
       }
-      return renderAuthError(res, 401, "login", { identifier }, baseMessage);
+      return renderAuthError(res, 401, "login", { email }, baseMessage);
     }
 
     await clearFailedLoginAttempts(user.id);
@@ -536,7 +526,6 @@ app.get("/register", (req, res) => {
   return res.render("register", {
     title: "Rejestracja",
     formData: {
-      username: "",
       email: "",
       name: "",
       password: "",
@@ -547,29 +536,18 @@ app.get("/register", (req, res) => {
 
 app.post("/register", async (req, res, next) => {
   try {
-    const username = normalizeUsername(req.body.username);
     const email = normalizeEmail(req.body.email);
-    const name = String(req.body.name || "").trim() || username;
+    const name = String(req.body.name || "").trim();
     const password = String(req.body.password || "");
     const passwordConfirm = String(req.body.passwordConfirm || "");
 
-    if (!username || !email) {
+    if (!email || !name) {
       return renderAuthError(
         res,
         400,
         "register",
-        { username, email, name, password: "", passwordConfirm: "" },
-        "Podaj nazwe uzytkownika i email."
-      );
-    }
-
-    if (!validateUsername(username)) {
-      return renderAuthError(
-        res,
-        400,
-        "register",
-        { username, email, name, password: "", passwordConfirm: "" },
-        "Nazwa uzytkownika musi miec 3-40 znakow: litery, cyfry, kropka, myslnik lub podkreslenie."
+        { email, name, password: "", passwordConfirm: "" },
+        "Podaj email oraz imie i nazwisko."
       );
     }
 
@@ -578,8 +556,18 @@ app.post("/register", async (req, res, next) => {
         res,
         400,
         "register",
-        { username, email, name, password: "", passwordConfirm: "" },
+        { email, name, password: "", passwordConfirm: "" },
         "Podaj poprawny adres email."
+      );
+    }
+
+    if (name.length > 120) {
+      return renderAuthError(
+        res,
+        400,
+        "register",
+        { email, name, password: "", passwordConfirm: "" },
+        "Imie i nazwisko moze miec maksymalnie 120 znakow."
       );
     }
 
@@ -589,7 +577,7 @@ app.post("/register", async (req, res, next) => {
         res,
         400,
         "register",
-        { username, email, name, password: "", passwordConfirm: "" },
+        { email, name, password: "", passwordConfirm: "" },
         passwordError
       );
     }
@@ -599,46 +587,36 @@ app.post("/register", async (req, res, next) => {
         res,
         400,
         "register",
-        { username, email, name, password: "", passwordConfirm: "" },
+        { email, name, password: "", passwordConfirm: "" },
         "Hasla musza byc identyczne."
       );
     }
 
-    const [existingByUsername, existingByEmail] = await Promise.all([
-      db.get("SELECT id FROM users WHERE lower(username) = lower(?)", [username]),
-      db.get("SELECT id FROM users WHERE lower(email) = lower(?)", [email]),
-    ]);
-
-    if (existingByUsername) {
-      return renderAuthError(
-        res,
-        409,
-        "register",
-        { username, email, name, password: "", passwordConfirm: "" },
-        "Ta nazwa uzytkownika jest juz zajeta."
-      );
-    }
+    const existingByEmail = await db.get(
+      "SELECT id FROM users WHERE lower(email) = lower(?)",
+      [email]
+    );
 
     if (existingByEmail) {
       return renderAuthError(
         res,
         409,
         "register",
-        { username, email, name, password: "", passwordConfirm: "" },
+        { email, name, password: "", passwordConfirm: "" },
         "Ten email jest juz zarejestrowany."
       );
     }
 
     const role = await determineRoleForNewUser(email);
-    const localIdentity = buildLocalIdentity(username);
+    const localIdentity = buildLocalIdentity(email);
     const passwordHash = hashPassword(password);
 
     const created = await db.run(
       `
-      INSERT INTO users (google_id, username, email, name, auth_provider, password_hash, is_active, role)
-      VALUES (?, ?, ?, ?, 'local', ?, 1, ?)
+      INSERT INTO users (google_id, email, name, auth_provider, password_hash, is_active, role)
+      VALUES (?, ?, ?, 'local', ?, 1, ?)
       `,
-      [localIdentity, username, email, name, passwordHash, role]
+      [localIdentity, email, name, passwordHash, role]
     );
 
     const user = await db.get("SELECT * FROM users WHERE id = ?", [created.lastID]);
@@ -700,7 +678,9 @@ app.get("/logout", ensureAuthenticated, (req, res, next) => {
 });
 
 app.use("/admin", adminRoutes);
+app.use("/manager/haccp", haccpManagerRoutes);
 app.use("/manager", managerRoutes);
+app.use("/employee/haccp", haccpEmployeeRoutes);
 app.use("/employee", employeeRoutes);
 app.use("/notifications", notificationRoutes);
 app.use("/profile", profileRoutes);

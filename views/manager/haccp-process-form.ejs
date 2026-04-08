@@ -1,0 +1,195 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <h1><%= formMode === "create" ? "Nowy proces HACCP" : "Edycja procesu HACCP" %></h1>
+
+  <% if (errors && errors.length > 0) { %>
+  <div class="flash flash--error">
+    <% errors.forEach((error) => { %>
+    <div><%= error %></div>
+    <% }) %>
+  </div>
+  <% } %>
+
+  <form
+    method="POST"
+    action="<%= formMode === 'create' ? '/manager/haccp/processes' : `/manager/haccp/processes/${processId}?_method=PUT` %>"
+    class="form-stack"
+  >
+    <label>
+      Nazwa procesu
+      <input type="text" name="name" required value="<%= formData.name %>" />
+    </label>
+
+    <label>
+      Opis
+      <input type="text" name="description" value="<%= formData.description %>" />
+    </label>
+
+    <div class="grid haccp-grid-3">
+      <label>
+        Czestotliwosc
+        <select name="frequencyType">
+          <% frequencyTypes.forEach((type) => { %>
+          <option value="<%= type %>" <%= formData.frequencyType === type ? "selected" : "" %>>
+            <%= type %>
+          </option>
+          <% }) %>
+        </select>
+      </label>
+
+      <label>
+        Wartosc czestotliwosci
+        <input
+          type="number"
+          min="1"
+          name="frequencyValue"
+          value="<%= formData.frequencyValue %>"
+        />
+      </label>
+
+      <div class="form-stack">
+        <label class="checkbox-row">
+          <input type="hidden" name="isActive" value="0" />
+          <input type="checkbox" name="isActive" value="1" <%= formData.isActive ? "checked" : "" %> />
+          Proces aktywny
+        </label>
+        <label class="checkbox-row">
+          <input type="hidden" name="isCcp" value="0" />
+          <input type="checkbox" name="isCcp" value="1" <%= formData.isCcp ? "checked" : "" %> />
+          Oznacz jako CCP
+        </label>
+      </div>
+    </div>
+
+    <section class="tenant-card">
+      <div class="section-head">
+        <h2>Definicja pol</h2>
+        <button class="btn" type="button" id="add-field">Dodaj pole</button>
+      </div>
+
+      <div id="fields-list" class="form-stack">
+        <% formData.fields.forEach((field, index) => { %>
+        <div class="haccp-field-row">
+          <label>
+            Nazwa
+            <input type="text" name="fieldName" required value="<%= field.name %>" />
+          </label>
+          <label>
+            Typ
+            <select name="fieldType">
+              <% fieldTypes.forEach((type) => { %>
+              <option value="<%= type %>" <%= field.type === type ? "selected" : "" %>><%= type %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label>
+            Wymagane
+            <select name="fieldRequired">
+              <option value="1" <%= field.required ? "selected" : "" %>>TAK</option>
+              <option value="0" <%= !field.required ? "selected" : "" %>>NIE</option>
+            </select>
+          </label>
+          <label>
+            Min (NUMBER)
+            <input type="text" name="fieldMinValue" value="<%= field.minValue %>" />
+          </label>
+          <label>
+            Max (NUMBER)
+            <input type="text" name="fieldMaxValue" value="<%= field.maxValue %>" />
+          </label>
+          <label>
+            Allowed (SELECT)
+            <input
+              type="text"
+              name="fieldAllowedValues"
+              value="<%= Array.isArray(field.allowedValues) ? field.allowedValues.join(', ') : '' %>"
+              placeholder="np. TAK, NIE, N/A"
+            />
+          </label>
+          <label>
+            Kolejnosc
+            <input type="number" min="1" name="fieldOrder" value="<%= field.order || (index + 1) %>" />
+          </label>
+          <button class="btn btn--danger remove-field" type="button">Usun</button>
+        </div>
+        <% }) %>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="btn btn--primary" type="submit">
+        <%= formMode === "create" ? "Utworz proces" : "Zapisz zmiany" %>
+      </button>
+      <a class="btn" href="/manager/haccp/processes">Anuluj</a>
+    </div>
+  </form>
+</section>
+
+<script>
+  const fieldsList = document.getElementById("fields-list");
+  const addFieldButton = document.getElementById("add-field");
+
+  function bindRemoveFieldButtons() {
+    document.querySelectorAll(".remove-field").forEach((button) => {
+      button.onclick = () => {
+        const rows = fieldsList.querySelectorAll(".haccp-field-row");
+        if (rows.length <= 1) {
+          return;
+        }
+        button.closest(".haccp-field-row").remove();
+      };
+    });
+  }
+
+  addFieldButton.onclick = () => {
+    const nextOrder = fieldsList.querySelectorAll(".haccp-field-row").length + 1;
+    const row = document.createElement("div");
+    row.className = "haccp-field-row";
+    row.innerHTML = `
+      <label>
+        Nazwa
+        <input type="text" name="fieldName" required />
+      </label>
+      <label>
+        Typ
+        <select name="fieldType">
+          <option value="BOOLEAN">BOOLEAN</option>
+          <option value="NUMBER" selected>NUMBER</option>
+          <option value="TEXT">TEXT</option>
+          <option value="SELECT">SELECT</option>
+        </select>
+      </label>
+      <label>
+        Wymagane
+        <select name="fieldRequired">
+          <option value="1" selected>TAK</option>
+          <option value="0">NIE</option>
+        </select>
+      </label>
+      <label>
+        Min (NUMBER)
+        <input type="text" name="fieldMinValue" />
+      </label>
+      <label>
+        Max (NUMBER)
+        <input type="text" name="fieldMaxValue" />
+      </label>
+      <label>
+        Allowed (SELECT)
+        <input type="text" name="fieldAllowedValues" />
+      </label>
+      <label>
+        Kolejnosc
+        <input type="number" min="1" name="fieldOrder" value="${nextOrder}" />
+      </label>
+      <button class="btn btn--danger remove-field" type="button">Usun</button>
+    `;
+    fieldsList.appendChild(row);
+    bindRemoveFieldButtons();
+  };
+
+  bindRemoveFieldButtons();
+</script>
+
+<%- include("../partials/bottom") %>

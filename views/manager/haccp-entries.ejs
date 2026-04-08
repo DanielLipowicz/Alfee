@@ -1,0 +1,127 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <div class="section-head">
+    <h1>Wpisy HACCP</h1>
+    <a class="btn" href="/manager/haccp">Dashboard</a>
+  </div>
+
+  <form class="form-inline" method="GET" action="/manager/haccp/entries">
+    <label>
+      Data od
+      <input type="date" name="dateFrom" value="<%= filters.dateFrom || '' %>" />
+    </label>
+    <label>
+      Data do
+      <input type="date" name="dateTo" value="<%= filters.dateTo || '' %>" />
+    </label>
+    <label>
+      Status
+      <select name="status">
+        <option value="">Wszystkie</option>
+        <% statuses.forEach((status) => { %>
+        <option value="<%= status %>" <%= filters.status === status ? "selected" : "" %>>
+          <%= status %>
+        </option>
+        <% }) %>
+      </select>
+    </label>
+    <label>
+      Proces
+      <select name="processId">
+        <option value="">Wszystkie</option>
+        <% processes.forEach((process) => { %>
+        <option
+          value="<%= process.id %>"
+          <%= Number(filters.processId) === Number(process.id) ? "selected" : "" %>
+        >
+          <%= process.name %>
+        </option>
+        <% }) %>
+      </select>
+    </label>
+    <label>
+      Pracownik
+      <select name="createdBy">
+        <option value="">Wszyscy</option>
+        <% employees.forEach((employee) => { %>
+        <option
+          value="<%= employee.id %>"
+          <%= Number(filters.createdBy) === Number(employee.id) ? "selected" : "" %>
+        >
+          <%= employee.name %> (<%= employee.email %>)
+        </option>
+        <% }) %>
+      </select>
+    </label>
+    <button class="btn btn--primary" type="submit">Filtruj</button>
+    <a class="btn" href="/manager/haccp/entries">Reset</a>
+  </form>
+</section>
+
+<section class="card">
+  <% if (entries.length === 0) { %>
+  <p>Brak wpisow spelniajacych warunki.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Proces</th>
+        <th>Status</th>
+        <th>Autor</th>
+        <th>Data</th>
+        <th>Dzialania korygujace</th>
+        <th>Review</th>
+        <th>Akcje</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% entries.forEach((entry) => { %>
+      <tr>
+        <td><%= entry.id %></td>
+        <td>
+          <%= entry.process_name %>
+          <% if (Number(entry.is_ccp) === 1) { %>
+          <span class="badge badge--critical">CCP</span>
+          <% } %>
+        </td>
+        <td>
+          <span class="badge badge--<%= String(entry.status || '').toLowerCase() %>">
+            <%= entry.status %>
+          </span>
+        </td>
+        <td><%= entry.created_by_name %></td>
+        <td><%= entry.created_at %></td>
+        <td>
+          <%= entry.corrective_action_count %>
+          <% if (entry.corrective_action_text) { %>
+          <div class="muted"><%= entry.corrective_action_text %></div>
+          <% } %>
+        </td>
+        <td>
+          <% if (Number(entry.is_reviewed) === 1) { %>
+          TAK
+          <div class="muted"><%= entry.reviewed_by_name || "-" %> / <%= entry.reviewed_at %></div>
+          <% } else { %>
+          NIE
+          <% } %>
+        </td>
+        <td>
+          <div class="actions">
+            <a class="btn" href="/manager/haccp/entries/<%= entry.id %>">Szczegoly</a>
+            <% if (Number(entry.is_reviewed) !== 1) { %>
+            <form method="POST" action="/manager/haccp/entries/<%= entry.id %>/review">
+              <button class="btn btn--primary" type="submit">Zatwierdz</button>
+            </form>
+            <% } %>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>
