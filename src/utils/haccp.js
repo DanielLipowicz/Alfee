@@ -1,12 +1,20 @@
 const fs = require("fs");
 const path = require("path");
-const PDFDocument = require("pdfkit");
 
 const { db } = require("../database");
 
 const FIELD_TYPES = ["BOOLEAN", "NUMBER", "TEXT", "SELECT"];
 const FREQUENCY_TYPES = ["NONE", "DAILY", "MULTIPLE_PER_DAY"];
 const ENTRY_STATUSES = ["OK", "ALERT", "CRITICAL"];
+
+function getPdfDocumentConstructor() {
+  try {
+    return require("pdfkit");
+  } catch (error) {
+    error.message = `Nie mozna zaladowac biblioteki PDF (pdfkit): ${error.message}`;
+    throw error;
+  }
+}
 
 function toArray(value) {
   if (Array.isArray(value)) {
@@ -1636,6 +1644,7 @@ function getPdfCellValue(row, column) {
 }
 
 async function buildPdfReport(reportGroups = [], filters = {}) {
+  const PDFDocument = getPdfDocumentConstructor();
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: "A4",
