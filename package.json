@@ -23,5 +23,10 @@
     "passport-google-oauth20": "^2.0.0",
     "pdfkit": "^0.17.1",
     "sqlite3": "^6.0.1"
+  },
+  "overrides": {
+    "connect-sqlite3": {
+      "sqlite3": "^6.0.1"
+    }
   }
 }
