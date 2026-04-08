@@ -22,6 +22,10 @@ npm_ci_prod() {
   npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
 }
 
+verify_dependencies() {
+  node -e 'const pkg=require("./package.json"); for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
+}
+
 echo "[1/5] Pulling latest code..."
 git pull --ff-only
 NEW_HEAD="$(git rev-parse HEAD)"
@@ -32,8 +36,8 @@ if git diff --name-only "${OLD_HEAD}" "${NEW_HEAD}" | grep -Eq '(^|/)package(-lo
   REASON="package files changed"
 elif [ ! -d node_modules ]; then
   REASON="node_modules missing"
-elif ! node -e "require.resolve('express')" >/dev/null 2>&1; then
-  REASON="express missing from node_modules"
+elif ! verify_dependencies >/dev/null 2>&1; then
+  REASON="dependencies missing or broken"
 fi
 
 if [ -n "${REASON}" ]; then
@@ -47,15 +51,15 @@ echo "[3/5] Ensuring runtime directories..."
 mkdir -p data uploads
 
 echo "[4/5] Verifying runtime dependencies..."
-if ! node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"; then
+if ! verify_dependencies; then
   echo "Dependency check failed. Reinstalling production dependencies..."
   rm -rf node_modules
   npm_ci_prod
 
-  if ! node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"; then
+  if ! verify_dependencies; then
     echo "Default sqlite3 binary failed. Trying compatible prebuilt sqlite3@5.1.7..."
     npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
-    node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"
+    verify_dependencies
   fi
 fi
 

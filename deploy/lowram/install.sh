@@ -43,6 +43,10 @@ echo "[3/6] Installing app dependencies (production only)..."
 cd "${APP_DIR}"
 npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
 
+verify_dependencies() {
+  node -e 'const pkg=require("./package.json"); for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
+}
+
 echo "[4/6] Creating runtime directories..."
 mkdir -p data uploads
 
@@ -51,7 +55,14 @@ if [[ ! -f "${APP_DIR}/.env" ]]; then
   cp .env.example .env
 fi
 
-echo "[6/6] Writing and starting systemd service..."
+echo "[6/7] Verifying installed modules..."
+if ! verify_dependencies; then
+  echo "Default sqlite3 binary failed. Trying compatible prebuilt sqlite3@5.1.7..."
+  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
+  verify_dependencies
+fi
+
+echo "[7/7] Writing and starting systemd service..."
 sudo tee "${SERVICE_FILE}" >/dev/null <<EOF
 [Unit]
 Description=Alfee Node.js app (low RAM mode)

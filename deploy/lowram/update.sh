@@ -11,6 +11,10 @@ npm_ci_prod() {
   npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
 }
 
+verify_dependencies() {
+  node -e 'const pkg=require("./package.json"); for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
+}
+
 echo "[1/4] Pulling latest code..."
 git pull --ff-only
 NEW_HEAD="$(git rev-parse HEAD)"
@@ -21,8 +25,8 @@ if git diff --name-only "${OLD_HEAD}" "${NEW_HEAD}" | grep -Eq '(^|/)package(-lo
   REASON="package files changed"
 elif [[ ! -d node_modules ]]; then
   REASON="node_modules missing"
-elif ! node -e "require.resolve('express')" >/dev/null 2>&1; then
-  REASON="express missing from node_modules"
+elif ! verify_dependencies >/dev/null 2>&1; then
+  REASON="dependencies missing or broken"
 fi
 
 if [[ -n "${REASON}" ]]; then

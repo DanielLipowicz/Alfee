@@ -51,6 +51,10 @@ echo "[3/8] Installing app dependencies (production only)..."
 cd "${APP_DIR}"
 npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
 
+verify_dependencies() {
+  node -e 'const pkg=require("./package.json"); for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
+}
+
 echo "[4/8] Creating runtime directories..."
 mkdir -p data uploads
 
@@ -60,10 +64,10 @@ if [ ! -f "${APP_DIR}/.env" ]; then
 fi
 
 echo "[6/8] Verifying installed modules..."
-if ! node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"; then
+if ! verify_dependencies; then
   echo "Default sqlite3 binary failed. Trying compatible prebuilt sqlite3@5.1.7..."
   npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
-  node -e "require('express'); require('sqlite3'); console.log('Dependency check OK')"
+  verify_dependencies
 fi
 
 echo "[7/8] Writing OpenRC service..."
