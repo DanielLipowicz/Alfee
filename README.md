@@ -30,15 +30,15 @@ Aplikacja webowa z trzema rolami:
 
 ## Stack
 
-- Node.js 24+ + Express
+- Node.js 20 LTS + Express
 - SQLite
 - EJS (SSR)
 - Passport (sesje) + Google OAuth 2.0
 
 ## Wymagania
 
-- Node.js `>=24`
-- npm `>=11`
+- Node.js `20.20.2` (LTS)
+- npm `>=10`
 
 ## Uruchomienie
 
@@ -51,6 +51,7 @@ npm install
 Jesli uzywasz `nvm`:
 
 ```bash
+nvm install
 nvm use
 ```
 

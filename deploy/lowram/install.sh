@@ -33,9 +33,9 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
-if [[ "${NODE_MAJOR}" -lt 24 ]]; then
-  echo "[2/7] Node <24 detected, upgrading to Node 24..."
-  curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+if [[ "${NODE_MAJOR}" -lt 20 ]]; then
+  echo "[2/7] Node <20 detected, upgrading to Node 20 LTS..."
+  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
   sudo apt-get install -y --no-install-recommends nodejs
 fi
 

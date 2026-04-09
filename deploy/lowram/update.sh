@@ -8,8 +8,8 @@ cd "${APP_DIR}"
 OLD_HEAD="$(git rev-parse HEAD)"
 
 NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
-if [[ "${NODE_MAJOR}" -lt 24 ]]; then
-  echo "ERROR: Node >= 24 is required. Installed: $(node -v)"
+if [[ "${NODE_MAJOR}" -lt 20 ]]; then
+  echo "ERROR: Node >= 20 is required. Installed: $(node -v)"
   exit 1
 fi
 

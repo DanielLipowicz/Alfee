@@ -12,8 +12,8 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=24",
-    "npm": ">=11"
+    "node": ">=20.20.2 <21",
+    "npm": ">=10"
   },
   "dependencies": {
     "connect-sqlite3": "^0.9.16",
