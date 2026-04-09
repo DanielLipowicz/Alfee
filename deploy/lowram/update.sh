@@ -7,6 +7,12 @@ SERVICE_NAME="alfee"
 cd "${APP_DIR}"
 OLD_HEAD="$(git rev-parse HEAD)"
 
+NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
+if [[ "${NODE_MAJOR}" -lt 24 ]]; then
+  echo "ERROR: Node >= 24 is required. Installed: $(node -v)"
+  exit 1
+fi
+
 npm_ci_prod() {
   npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
 }

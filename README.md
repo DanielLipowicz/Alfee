@@ -30,10 +30,15 @@ Aplikacja webowa z trzema rolami:
 
 ## Stack
 
-- Node.js + Express
+- Node.js 24+ + Express
 - SQLite
 - EJS (SSR)
 - Passport (sesje) + Google OAuth 2.0
+
+## Wymagania
+
+- Node.js `>=24`
+- npm `>=11`
 
 ## Uruchomienie
 
@@ -41,6 +46,12 @@ Aplikacja webowa z trzema rolami:
 
 ```bash
 npm install
+```
+
+Jesli uzywasz `nvm`:
+
+```bash
+nvm use
 ```
 
 2. Utworz plik `.env` na podstawie `.env.example`.
@@ -216,7 +227,7 @@ rc-service alfee stop || true
 rm -rf node_modules
 npm cache clean --force
 npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
-npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
+npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm rebuild sqlite3 --build-from-source
 node -e "require('express'); require('sqlite3'); console.log('OK')"
 rc-service alfee restart
 tail -n 100 /var/log/alfee.err

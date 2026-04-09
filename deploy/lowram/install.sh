@@ -23,9 +23,9 @@ if ! command -v apt-get >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "[1/6] Installing system dependencies..."
+echo "[1/7] Installing system dependencies..."
 sudo apt-get update
-sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg git nodejs npm
+sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg git nodejs npm python3 make g++
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: node was not installed."
@@ -33,13 +33,13 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
-if [[ "${NODE_MAJOR}" -lt 18 ]]; then
-  echo "[2/6] Node <18 detected, upgrading to Node 20..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+if [[ "${NODE_MAJOR}" -lt 24 ]]; then
+  echo "[2/7] Node <24 detected, upgrading to Node 24..."
+  curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
   sudo apt-get install -y --no-install-recommends nodejs
 fi
 
-echo "[3/6] Installing app dependencies (production only)..."
+echo "[3/7] Installing app dependencies (production only)..."
 cd "${APP_DIR}"
 npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
 
@@ -47,18 +47,18 @@ verify_dependencies() {
   node -e 'const pkg=require("./package.json"); for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
 }
 
-echo "[4/6] Creating runtime directories..."
+echo "[4/7] Creating runtime directories..."
 mkdir -p data uploads
 
 if [[ ! -f "${APP_DIR}/.env" ]]; then
-  echo "[5/6] Creating .env from example..."
+  echo "[5/7] Creating .env from example..."
   cp .env.example .env
 fi
 
 echo "[6/7] Verifying installed modules..."
 if ! verify_dependencies; then
-  echo "Default sqlite3 binary failed. Trying compatible prebuilt sqlite3@5.1.7..."
-  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
+  echo "sqlite3 load failed. Rebuilding sqlite3 from source for current Node..."
+  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
   verify_dependencies
 fi
 

@@ -18,6 +18,12 @@ as_root() {
 cd "${APP_DIR}"
 OLD_HEAD="$(git rev-parse HEAD)"
 
+NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
+if [ "${NODE_MAJOR}" -lt 24 ]; then
+  echo "ERROR: Node >= 24 is required. Installed: $(node -v)"
+  exit 1
+fi
+
 npm_ci_prod() {
   npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
 }
@@ -57,8 +63,8 @@ if ! verify_dependencies; then
   npm_ci_prod
 
   if ! verify_dependencies; then
-    echo "Default sqlite3 binary failed. Trying compatible prebuilt sqlite3@5.1.7..."
-    npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund sqlite3@5.1.7
+    echo "sqlite3 load failed. Rebuilding sqlite3 from source for current Node..."
+    npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm rebuild sqlite3 --build-from-source
     verify_dependencies
   fi
 fi

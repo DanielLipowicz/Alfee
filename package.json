@@ -11,6 +11,10 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11"
+  },
   "dependencies": {
     "connect-sqlite3": "^0.9.16",
     "dotenv": "^17.4.0",
