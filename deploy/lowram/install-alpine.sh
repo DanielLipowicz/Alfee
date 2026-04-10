@@ -46,24 +46,12 @@ ensure_sqlite3_compat() {
   INSTALLED_SQLITE3_VERSION="$(node -p 'try { require("sqlite3/package.json").version } catch (_) { "" }')"
   if [ "${INSTALLED_SQLITE3_VERSION}" != "${REQUIRED_SQLITE3_VERSION}" ]; then
     echo "Installing sqlite3@${REQUIRED_SQLITE3_VERSION} for Node ${REQUIRED_NODE_VERSION} compatibility..."
-    npm_config_build_from_source=true npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
-  fi
-}
-
-rebuild_sqlite3_native() {
-  echo "Rebuilding sqlite3 native modules for Alpine/musl..."
-  npm_config_build_from_source=true npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm rebuild sqlite3 --build-from-source
-
-  if [ -d node_modules/connect-sqlite3/node_modules/sqlite3 ]; then
-    (
-      cd node_modules/connect-sqlite3/node_modules/sqlite3
-      npm_config_build_from_source=true npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm rebuild --build-from-source
-    )
+    npm_config_target_libc=musl npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
   fi
 }
 
 npm_ci_prod() {
-  npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
+  npm_config_target_libc=musl npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
   ensure_sqlite3_compat
 }
 
@@ -95,8 +83,11 @@ fi
 
 echo "[6/8] Verifying installed modules..."
 if ! verify_dependencies; then
-  rebuild_sqlite3_native
-  verify_dependencies
+  echo "ERROR: sqlite modules are still incompatible on Alpine."
+  echo "Try cleaning prebuild cache and reinstalling dependencies:"
+  echo "  rm -rf node_modules ~/.npm/_prebuilds"
+  echo "  npm_config_target_libc=musl npm ci --omit=dev --no-audit --no-fund"
+  exit 1
 fi
 
 echo "[7/8] Writing OpenRC service..."
