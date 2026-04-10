@@ -50,9 +50,17 @@ ensure_sqlite3_compat() {
   fi
 }
 
+normalize_sqlite3_tree() {
+  # Ensure connect-sqlite3 resolves the same top-level sqlite3 package.
+  if [ -d node_modules/connect-sqlite3/node_modules/sqlite3 ]; then
+    rm -rf node_modules/connect-sqlite3/node_modules/sqlite3
+  fi
+}
+
 npm_ci_prod() {
   npm_config_target_libc=musl npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund
   ensure_sqlite3_compat
+  normalize_sqlite3_tree
 }
 
 verify_dependencies() {
