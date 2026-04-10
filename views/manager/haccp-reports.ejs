@@ -96,7 +96,8 @@
           <th>ID</th>
           <th>Status</th>
           <th>Autor</th>
-          <th>Data</th>
+          <th>Utworzono</th>
+          <th>Dotyczy godz.</th>
           <th>Review</th>
           <th>Dzialania korygujace</th>
           <% group.fields.forEach((field) => { %>
@@ -116,6 +117,7 @@
           </td>
           <td><%= row.created_by_name %></td>
           <td><%= row.created_at %></td>
+          <td><%= row.recorded_for_at || row.created_at %></td>
           <td>
             <%= Number(row.is_reviewed) === 1 ? "TAK" : "NIE" %>
             <% if (Number(row.is_reviewed) === 1) { %>

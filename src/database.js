@@ -67,7 +67,7 @@ async function migrateTenantData() {
     "SELECT COUNT(*) AS total FROM tasks WHERE organization_id IS NULL"
   );
   const usersRequiringMembership = await db.get(
-    "SELECT COUNT(*) AS total FROM users WHERE role IN ('manager', 'employee')"
+    "SELECT COUNT(*) AS total FROM users WHERE role IN ('manager', 'employee', 'observer')"
   );
 
   if (
@@ -102,7 +102,7 @@ async function migrateTenantData() {
         INSERT OR IGNORE INTO user_organizations (user_id, organization_id)
         SELECT id, ?
         FROM users
-        WHERE role IN ('manager', 'employee')
+        WHERE role IN ('manager', 'employee', 'observer')
         `,
         [firstOrganization.id]
       );
@@ -184,9 +184,11 @@ async function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       organization_id INTEGER,
+      observer_id INTEGER,
       created_by INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (observer_id) REFERENCES users(id) ON DELETE SET NULL,
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
@@ -194,6 +196,34 @@ async function initDatabase() {
   if (!(await tableHasColumn("tasks", "organization_id"))) {
     await db.run("ALTER TABLE tasks ADD COLUMN organization_id INTEGER");
   }
+
+  if (!(await tableHasColumn("tasks", "observer_id"))) {
+    await db.run("ALTER TABLE tasks ADD COLUMN observer_id INTEGER");
+  }
+
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS task_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      comment_text TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS assignment_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      assignment_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      comment_text TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
 
   await db.run(`
     CREATE TABLE IF NOT EXISTS task_steps (
@@ -211,12 +241,28 @@ async function initDatabase() {
       task_id INTEGER NOT NULL,
       employee_id INTEGER NOT NULL,
       assigned_by INTEGER NOT NULL,
+      observer_id INTEGER,
       status TEXT NOT NULL DEFAULT 'in_progress',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
       FOREIGN KEY (employee_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE CASCADE
+      FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (observer_id) REFERENCES users(id) ON DELETE SET NULL
     )
+  `);
+
+  if (!(await tableHasColumn("assignments", "observer_id"))) {
+    await db.run("ALTER TABLE assignments ADD COLUMN observer_id INTEGER");
+  }
+
+  await db.run(`
+    UPDATE assignments
+    SET observer_id = (
+      SELECT t.observer_id
+      FROM tasks t
+      WHERE t.id = assignments.task_id
+    )
+    WHERE observer_id IS NULL
   `);
 
   await db.run(`
@@ -298,6 +344,7 @@ async function initDatabase() {
       process_id INTEGER NOT NULL,
       organization_id INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      recorded_for_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       created_by INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'OK',
       is_reviewed INTEGER NOT NULL DEFAULT 0,
@@ -309,6 +356,15 @@ async function initDatabase() {
       FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
     )
   `);
+
+  if (!(await tableHasColumn("haccp_process_entries", "recorded_for_at"))) {
+    await db.run(
+      "ALTER TABLE haccp_process_entries ADD COLUMN recorded_for_at TEXT"
+    );
+  }
+  await db.run(
+    "UPDATE haccp_process_entries SET recorded_for_at = COALESCE(recorded_for_at, created_at)"
+  );
 
   await db.run(`
     CREATE TABLE IF NOT EXISTS haccp_process_entry_values (
@@ -375,6 +431,15 @@ async function initDatabase() {
     "CREATE INDEX IF NOT EXISTS idx_tasks_organization_id ON tasks (organization_id)"
   );
   await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_tasks_observer_id ON tasks (observer_id)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_task_comments_task_created ON task_comments (task_id, created_at)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_assignment_comments_assignment_created ON assignment_comments (assignment_id, created_at)"
+  );
+  await db.run(
     "CREATE INDEX IF NOT EXISTS idx_user_organizations_user_id ON user_organizations (user_id)"
   );
   await db.run(
@@ -387,6 +452,9 @@ async function initDatabase() {
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_haccp_process_org_name ON haccp_processes (organization_id, name)"
   );
   await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_assignments_observer_id ON assignments (observer_id)"
+  );
+  await db.run(
     "CREATE INDEX IF NOT EXISTS idx_haccp_process_org_active ON haccp_processes (organization_id, is_active)"
   );
   await db.run(
@@ -396,7 +464,13 @@ async function initDatabase() {
     "CREATE INDEX IF NOT EXISTS idx_haccp_entries_process_created ON haccp_process_entries (process_id, created_at)"
   );
   await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_entries_process_recorded_for ON haccp_process_entries (process_id, recorded_for_at)"
+  );
+  await db.run(
     "CREATE INDEX IF NOT EXISTS idx_haccp_entries_org_created ON haccp_process_entries (organization_id, created_at)"
+  );
+  await db.run(
+    "CREATE INDEX IF NOT EXISTS idx_haccp_entries_org_recorded_for ON haccp_process_entries (organization_id, recorded_for_at)"
   );
   await db.run(
     "CREATE INDEX IF NOT EXISTS idx_haccp_entries_creator ON haccp_process_entries (created_by, created_at)"

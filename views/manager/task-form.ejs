@@ -13,6 +13,21 @@
       <input type="text" name="title" required value="<%= task?.title || '' %>" />
     </label>
 
+    <label>
+      Obserwator
+      <select name="observerId">
+        <option value="">-- brak --</option>
+        <% (observers || []).forEach((observer) => { %>
+        <option
+          value="<%= observer.id %>"
+          <%= Number(selectedObserverId || 0) === Number(observer.id) ? "selected" : "" %>
+        >
+          <%= observer.name %> (<%= observer.email %>)
+        </option>
+        <% }) %>
+      </select>
+    </label>
+
     <div>
       <div class="section-head">
         <h2>Czynności do wykonania</h2>

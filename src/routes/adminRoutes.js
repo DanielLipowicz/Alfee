@@ -38,7 +38,7 @@ router.get("/organizations", async (_req, res, next) => {
         `
         SELECT id, name, email, role
         FROM users
-        WHERE role IN ('manager', 'employee')
+        WHERE role IN ('manager', 'employee', 'observer')
         ORDER BY role ASC, name ASC
         `
       ),
@@ -50,7 +50,8 @@ router.get("/organizations", async (_req, res, next) => {
           CASE role
             WHEN 'admin' THEN 1
             WHEN 'manager' THEN 2
-            ELSE 3
+            WHEN 'observer' THEN 3
+            ELSE 4
           END,
           name ASC
         `
@@ -205,7 +206,7 @@ router.delete("/organizations/:organizationId", async (req, res, next) => {
 router.put("/users/:userId/role", async (req, res, next) => {
   const userId = Number(req.params.userId);
   const targetRole = String(req.body.role || "").trim();
-  const allowedRoles = ["admin", "manager", "employee"];
+  const allowedRoles = ["admin", "manager", "employee", "observer"];
 
   if (!userId || !allowedRoles.includes(targetRole)) {
     setFlash(req, "error", "Niepoprawna rola lub uzytkownik.");
@@ -281,7 +282,7 @@ router.post("/memberships", async (req, res, next) => {
     const [organization, user] = await Promise.all([
       db.get("SELECT id FROM organizations WHERE id = ?", [organizationId]),
       db.get(
-        "SELECT id, role FROM users WHERE id = ? AND role IN ('manager', 'employee')",
+        "SELECT id, role FROM users WHERE id = ? AND role IN ('manager', 'employee', 'observer')",
         [userId]
       ),
     ]);

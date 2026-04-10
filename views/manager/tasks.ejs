@@ -7,14 +7,15 @@
   </div>
 
   <% if (tasks.length === 0) { %>
-  <p>Nie utworzono jeszcze żadnego zadania.</p>
+  <p>Nie utworzono jeszcze zadnego zadania.</p>
   <% } else { %>
   <table>
     <thead>
       <tr>
         <th>Nazwa</th>
-        <th>Czynności</th>
-        <th>Przydziały</th>
+        <th>Obserwator</th>
+        <th>Czynnosci</th>
+        <th>Przydzialy</th>
         <th>Akcje</th>
       </tr>
     </thead>
@@ -22,6 +23,7 @@
       <% tasks.forEach((task) => { %>
       <tr>
         <td><%= task.title %></td>
+        <td><%= task.observer_name || "-" %></td>
         <td><%= task.step_count %></td>
         <td><%= task.assignment_count %></td>
         <td>
@@ -32,7 +34,7 @@
               <button class="btn" type="submit">Kopiuj</button>
             </form>
             <form method="POST" action="/manager/tasks/<%= task.id %>?_method=DELETE">
-              <button class="btn btn--danger" type="submit">Usuń</button>
+              <button class="btn btn--danger" type="submit">Usun</button>
             </form>
           </div>
         </td>

@@ -1,7 +1,7 @@
 <%- include("../partials/top", { title }) %>
 
 <section class="card">
-  <h1><%= assignment.title %></h1>
+  <h1>Wykonanie zadania: <%= assignment.title %></h1>
   <p>
     Organizacja:
     <strong><%= assignment.organization_name %></strong>
@@ -35,7 +35,7 @@
     <div
       class="steps-progress__track js-assignment-progress-track"
       role="progressbar"
-      aria-label="Postep wykonania zadania"
+      aria-label="Postep wykonania"
       aria-valuemin="0"
       aria-valuemax="100"
       aria-valuenow="<%= progress.percentage %>"
@@ -120,6 +120,12 @@
     <% }) %>
   </ol>
 </section>
+
+<%- include("../partials/task-comments", {
+  comments,
+  commentAction: `/employee/tasks/${assignment.id}/comments`,
+  redirectTo: `/employee/tasks/${assignment.id}`,
+}) %>
 
 <script>
   (() => {

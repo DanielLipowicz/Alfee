@@ -17,7 +17,7 @@
             <a href="/manager/dashboard">Panel kierownika</a>
             <a href="/manager/tasks">Zadania</a>
             <a href="/manager/haccp">HACCP</a>
-            <a href="/manager/employees/new">Nowy pracownik</a>
+            <a href="/manager/employees/new">Nowy pracownik/obserwator</a>
             <a href="/manager/assignments">Postep</a>
             <% } %>
             <a href="/admin/organizations">Organizacje</a>
@@ -33,7 +33,7 @@
             <a href="/manager/dashboard">Panel</a>
             <a href="/manager/tasks">Zadania</a>
             <a href="/manager/haccp">HACCP</a>
-            <a href="/manager/employees/new">Nowy pracownik</a>
+            <a href="/manager/employees/new">Nowy pracownik/obserwator</a>
             <a href="/manager/assignments">Postep</a>
             <a href="/profile">Profil</a>
             <a href="/notifications">
@@ -54,11 +54,32 @@
               <% } %>
             </a>
             <a href="/logout">Wyloguj</a>
-          <% } else { %>
+            <% } else if (currentUser && currentUser.role === "observer") { %>
+            <a href="/observer/tasks">Obserwowane zadania</a>
+            <a href="/profile">Profil</a>
+            <a href="/notifications">
+              Powiadomienia
+              <% if (unreadNotifications > 0) { %>
+              <span class="nav-badge"><%= unreadNotifications %></span>
+              <% } %>
+            </a>
+            <a href="/logout">Wyloguj</a>
+            <% } else { %>
           <a href="/login">Logowanie</a>
           <a href="/register">Rejestracja</a>
           <% } %>
         </nav>
+
+          <% if (currentUser) { %>
+          <% const roleLabel = currentUser.role === "admin" ? "administrator" : currentUser.role === "manager" ? "kierownik" : currentUser.role === "observer" ? "obserwator" : "pracownik"; %>
+          <div class="session-user">
+            <span class="session-user__label">Zalogowano:</span>
+            <strong><%= currentUser.name || currentUser.email %></strong>
+            <span class="session-user__email">(<%= currentUser.email %>)</span>
+            <span class="session-user__sep">|</span>
+            <span>Typ konta: <strong><%= roleLabel %></strong></span>
+          </div>
+          <% } %>
 
           <% if (currentUser && currentUser.role === "admin" && isAdminManagerMode) { %>
           <div class="admin-mode-bar">

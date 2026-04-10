@@ -7,6 +7,12 @@ const { ensureAuthenticated, ensureEmployee } = require("../middleware/auth");
 const { setFlash } = require("../utils/flash");
 const { withProgress } = require("../utils/tasks");
 const { uploadEvidence } = require("../middleware/upload");
+const {
+  addAssignmentCommentAndNotify,
+  listAssignmentComments,
+  normalizeCommentText,
+  validateCommentText,
+} = require("../utils/assignmentComments");
 
 const router = express.Router();
 
@@ -131,12 +137,29 @@ async function updateAssignmentStatus(assignmentId) {
   };
 }
 
+async function getEmployeeAssignment(assignmentId, employeeId) {
+  return db.get(
+    `
+    SELECT
+      a.id,
+      a.task_id
+    FROM assignments a
+    JOIN tasks t ON t.id = a.task_id
+    JOIN user_organizations uo
+      ON uo.organization_id = t.organization_id AND uo.user_id = a.employee_id
+    WHERE a.id = ? AND a.employee_id = ?
+    `,
+    [assignmentId, employeeId]
+  );
+}
+
 router.get("/tasks", async (req, res, next) => {
   try {
     const assignments = await db.all(
       `
       SELECT
         a.id,
+        a.task_id,
         a.status,
         a.created_at,
         t.title,
@@ -157,7 +180,7 @@ router.get("/tasks", async (req, res, next) => {
     );
 
     return res.render("employee/tasks", {
-      title: "Moje zadania",
+      title: "Moje wykonania zadan",
       assignments: withProgress(assignments),
     });
   } catch (error) {
@@ -220,20 +243,23 @@ router.get("/tasks/:assignmentId", async (req, res, next) => {
     );
     await refreshUnreadNotificationsCount(req.user.id, res);
 
-    const evidence = await db.all(
-      `
-      SELECT
-        e.id,
-        e.assignment_step_id,
-        e.image_path,
-        e.uploaded_at
-      FROM step_evidence e
-      JOIN assignment_steps s ON s.id = e.assignment_step_id
-      WHERE s.assignment_id = ?
-      ORDER BY e.uploaded_at DESC
-      `,
-      [assignment.id]
-    );
+    const [evidence, comments] = await Promise.all([
+      db.all(
+        `
+        SELECT
+          e.id,
+          e.assignment_step_id,
+          e.image_path,
+          e.uploaded_at
+        FROM step_evidence e
+        JOIN assignment_steps s ON s.id = e.assignment_step_id
+        WHERE s.assignment_id = ?
+        ORDER BY e.uploaded_at DESC
+        `,
+        [assignment.id]
+      ),
+      listAssignmentComments(assignment.id),
+    ]);
 
     const evidenceByStep = evidence.reduce((acc, item) => {
       if (!acc[item.assignment_step_id]) {
@@ -252,12 +278,42 @@ router.get("/tasks/:assignmentId", async (req, res, next) => {
     ])[0];
 
     return res.render("employee/task-detail", {
-      title: assignment.title,
+      title: `Wykonanie: ${assignment.title}`,
       assignment,
       steps,
       evidenceByStep,
       progress,
+      comments,
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/tasks/:assignmentId/comments", async (req, res, next) => {
+  const commentText = normalizeCommentText(req.body.commentText);
+  const redirectTo =
+    String(req.body.redirectTo || req.get("referer") || "").trim() ||
+    `/employee/tasks/${req.params.assignmentId}`;
+
+  const validationError = validateCommentText(commentText);
+  if (validationError) {
+    setFlash(req, "error", validationError);
+    return res.redirect(redirectTo);
+  }
+
+  try {
+    const assignment = await getEmployeeAssignment(req.params.assignmentId, req.user.id);
+    if (!assignment) {
+      return res.status(404).render("error", {
+        title: "Brak zadania",
+        message: "Nie znaleziono wskazanego zadania.",
+      });
+    }
+
+    await addAssignmentCommentAndNotify(assignment.id, req.user, commentText);
+    setFlash(req, "success", "Dodano komentarz.");
+    return res.redirect(redirectTo);
   } catch (error) {
     return next(error);
   }

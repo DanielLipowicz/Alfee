@@ -52,6 +52,42 @@
 </section>
 
 <section class="card">
+  <h2>Alerty powiazane z moimi wpisami</h2>
+  <% if (alerts.length === 0) { %>
+  <p>Brak alertow.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Priorytet</th>
+        <th>Proces</th>
+        <th>Wpis</th>
+        <th>Tresc</th>
+        <th>Data</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% alerts.forEach((alert) => { %>
+      <tr>
+        <td>
+          <span class="badge badge--severity-<%= String(alert.severity || '').toLowerCase() %>">
+            <%= alert.severity %>
+          </span>
+        </td>
+        <td><%= alert.process_name %></td>
+        <td><a href="/employee/haccp/entries/<%= alert.entry_id %>">#<%= alert.entry_id %></a></td>
+        <td><%= alert.message %></td>
+        <td><%= alert.created_at %></td>
+        <td><%= Number(alert.resolved) === 1 ? `Rozwiazany (${alert.resolved_at || "-"})` : "Otwarty" %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<section class="card">
   <h2>Moje wpisy</h2>
   <% if (entries.length === 0) { %>
   <p>Nie dodano jeszcze wpisow HACCP.</p>
@@ -82,46 +118,10 @@
         <td>
           <%= Number(entry.is_reviewed) === 1 ? `TAK (${entry.reviewed_at || "-"})` : "NIE" %>
         </td>
-        <td><%= entry.created_at %></td>
+        <td><%= entry.recorded_for_at || entry.created_at %></td>
         <td>
           <a class="btn" href="/employee/haccp/entries/<%= entry.id %>">Szczegoly</a>
         </td>
-      </tr>
-      <% }) %>
-    </tbody>
-  </table>
-  <% } %>
-</section>
-
-<section class="card">
-  <h2>Alerty powiazane z moimi wpisami</h2>
-  <% if (alerts.length === 0) { %>
-  <p>Brak alertow.</p>
-  <% } else { %>
-  <table>
-    <thead>
-      <tr>
-        <th>Priorytet</th>
-        <th>Proces</th>
-        <th>Wpis</th>
-        <th>Tresc</th>
-        <th>Data</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% alerts.forEach((alert) => { %>
-      <tr>
-        <td>
-          <span class="badge badge--severity-<%= String(alert.severity || '').toLowerCase() %>">
-            <%= alert.severity %>
-          </span>
-        </td>
-        <td><%= alert.process_name %></td>
-        <td><a href="/employee/haccp/entries/<%= alert.entry_id %>">#<%= alert.entry_id %></a></td>
-        <td><%= alert.message %></td>
-        <td><%= alert.created_at %></td>
-        <td><%= Number(alert.resolved) === 1 ? `Rozwiazany (${alert.resolved_at || "-"})` : "Otwarty" %></td>
       </tr>
       <% }) %>
     </tbody>

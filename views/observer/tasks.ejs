@@ -1,0 +1,32 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card">
+  <h1>Obserwowane zadania (szablony)</h1>
+
+  <% if (!tasks || tasks.length === 0) { %>
+  <p>Nie masz jeszcze przypisanych zadan do obserwacji.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Szablon zadania</th>
+        <th>Organizacja</th>
+        <th>Liczba wykonan</th>
+        <th>Wykonania ukonczone</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% tasks.forEach((task) => { %>
+      <tr>
+        <td><a href="/observer/tasks/<%= task.id %>"><%= task.title %></a></td>
+        <td><%= task.organization_name %></td>
+        <td><%= task.assignment_count %></td>
+        <td><%= task.completed_assignments %>/<%= task.assignment_count %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<%- include("../partials/bottom") %>

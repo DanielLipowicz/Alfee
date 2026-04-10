@@ -30,7 +30,7 @@
         <th>Priorytet</th>
         <th>Typ</th>
         <th>Proces</th>
-        <th>Wpis</th>
+        <th>Wpis/Odniesienie</th>
         <th>Tresc</th>
         <th>Data</th>
         <th>Status</th>
@@ -50,6 +50,8 @@
         <td>
           <% if (alert.entry_id) { %>
           <a href="/manager/haccp/entries/<%= alert.entry_id %>">#<%= alert.entry_id %></a>
+          <% } else if (alert.referenceUrl) { %>
+          <a href="<%= alert.referenceUrl %>"><%= alert.referenceLabel %></a>
           <% } else { %>
           -
           <% } %>
@@ -59,9 +61,14 @@
         <td><%= Number(alert.resolved) === 1 ? `Rozwiazany (${alert.resolved_at || "-"})` : "Otwarty" %></td>
         <td>
           <% if (Number(alert.resolved) !== 1) { %>
-          <form method="POST" action="/manager/haccp/alerts/<%= alert.id %>/resolve">
-            <button class="btn btn--primary" type="submit">Zamknij</button>
-          </form>
+          <div class="actions">
+            <% if (alert.alert_type === "MISSING_ENTRY" && alert.process_id) { %>
+            <a class="btn" href="/manager/haccp/alerts/<%= alert.id %>/fill-missing">Uzupelnij wpis</a>
+            <% } %>
+            <form method="POST" action="/manager/haccp/alerts/<%= alert.id %>/resolve">
+              <button class="btn btn--primary" type="submit">Zamknij</button>
+            </form>
+          </div>
           <% } else { %>
           -
           <% } %>

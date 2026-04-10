@@ -120,6 +120,25 @@ code {
   color: #dce5f4;
 }
 
+.session-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #36578a;
+  border-radius: 999px;
+  color: #dce5f4;
+  font-size: 0.85rem;
+  background: rgba(11, 99, 246, 0.08);
+  flex-wrap: wrap;
+}
+
+.session-user__label,
+.session-user__email,
+.session-user__sep {
+  color: #b7c7e2;
+}
+
 .admin-mode-bar .btn {
   background: transparent;
   color: #fff;
@@ -290,6 +309,7 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="date"],
+input[type="datetime-local"],
 input[type="number"],
 textarea,
 select {
@@ -613,6 +633,50 @@ select {
   gap: 1rem;
 }
 
+.credential-copy-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.credential-copy-input {
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+.task-comments-empty {
+  margin-top: 1rem;
+}
+
+.task-comments-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.task-comments-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: #f8fbff;
+}
+
+.task-comments-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.task-comments-text {
+  margin: 0.5rem 0 0;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 @media (max-width: 720px) {
   .header__content {
     flex-direction: column;
@@ -639,11 +703,20 @@ select {
     flex-wrap: wrap;
   }
 
+  .session-user {
+    width: 100%;
+    border-radius: 10px;
+  }
+
   .step-row {
     flex-direction: column;
   }
 
   .step-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .credential-copy-row {
     grid-template-columns: 1fr;
   }
 }

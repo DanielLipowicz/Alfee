@@ -1,0 +1,48 @@
+<section class="card">
+  <h2>Komentarze wykonania</h2>
+  <p class="muted">Komentarze sa jawne dla uczestnikow tego wykonania zadania.</p>
+
+  <form class="form-stack" method="POST" action="<%= commentAction %>">
+    <input type="hidden" name="redirectTo" value="<%= redirectTo %>" />
+    <label>
+      Dodaj komentarz
+      <textarea
+        name="commentText"
+        rows="3"
+        maxlength="2000"
+        required
+        placeholder="Wpisz komentarz dotyczacy tego wykonania"
+      ></textarea>
+    </label>
+    <div>
+      <button class="btn btn--primary" type="submit">Dodaj komentarz</button>
+    </div>
+  </form>
+
+  <% if (!comments || comments.length === 0) { %>
+  <p class="muted task-comments-empty">Brak komentarzy.</p>
+  <% } else { %>
+  <ul class="task-comments-list">
+    <% comments.forEach((comment) => { %>
+    <li class="task-comments-item">
+      <div class="task-comments-head">
+        <strong><%= comment.author_name %></strong>
+        <span class="muted">
+          <% if (comment.author_role === "admin") { %>
+          administrator
+          <% } else if (comment.author_role === "manager") { %>
+          kierownik
+          <% } else if (comment.author_role === "observer") { %>
+          obserwator
+          <% } else { %>
+          pracownik
+          <% } %>
+          - <%= comment.created_at %>
+        </span>
+      </div>
+      <p class="task-comments-text"><%= comment.comment_text %></p>
+    </li>
+    <% }) %>
+  </ul>
+  <% } %>
+</section>

@@ -35,46 +35,6 @@
 
 <section class="card">
   <div class="section-head">
-    <h2>Najnowsze wpisy</h2>
-    <a class="btn" href="/manager/haccp/reports">Pelna lista</a>
-  </div>
-
-  <% if (latestEntries.length === 0) { %>
-  <p>Brak wpisow HACCP.</p>
-  <% } else { %>
-  <table>
-    <thead>
-      <tr>
-        <th>Proces</th>
-        <th>Status</th>
-        <th>Autor</th>
-        <th>Data</th>
-        <th>Akcje</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% latestEntries.forEach((entry) => { %>
-      <tr>
-        <td><%= entry.process_name %></td>
-        <td>
-          <span class="badge badge--<%= String(entry.status || '').toLowerCase() %>">
-            <%= entry.status %>
-          </span>
-        </td>
-        <td><%= entry.created_by_name %></td>
-        <td><%= entry.created_at %></td>
-        <td>
-          <a class="btn" href="/manager/haccp/entries/<%= entry.id %>">Szczegoly</a>
-        </td>
-      </tr>
-      <% }) %>
-    </tbody>
-  </table>
-  <% } %>
-</section>
-
-<section class="card">
-  <div class="section-head">
     <h2>Otwarte alerty</h2>
     <a class="btn" href="/manager/haccp/alerts?resolved=0">Pelna lista</a>
   </div>
@@ -89,6 +49,7 @@
         <th>Proces</th>
         <th>Tresc</th>
         <th>Data</th>
+        <th>Akcje</th>
       </tr>
     </thead>
     <tbody>
@@ -102,6 +63,50 @@
         <td><%= alert.process_name || "-" %></td>
         <td><%= alert.message %></td>
         <td><%= alert.created_at %></td>
+        <td>
+          <div class="actions">
+            <% if (alert.alert_type === "MISSING_ENTRY" && alert.process_id) { %>
+            <a class="btn" href="/manager/haccp/alerts/<%= alert.id %>/fill-missing">Uzupelnij</a>
+            <% } %>
+            <a class="btn" href="/manager/haccp/alerts">Szczegoly</a>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<section class="card">
+  <div class="section-head">
+    <h2>Najnowsze wpisy</h2>
+    <a class="btn" href="/manager/haccp/reports">Pelna lista</a>
+  </div>
+
+  <% if (latestEntries.length === 0) { %>
+  <p>Brak wpisow HACCP.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Proces</th>
+        <th>Status</th>
+        <th>Autor</th>
+        <th>Data</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% latestEntries.forEach((entry) => { %>
+      <tr>
+        <td><%= entry.process_name %></td>
+        <td>
+          <span class="badge badge--<%= String(entry.status || '').toLowerCase() %>">
+            <%= entry.status %>
+          </span>
+        </td>
+        <td><%= entry.created_by_name %></td>
+        <td><%= entry.recorded_for_at || entry.created_at %></td>
       </tr>
       <% }) %>
     </tbody>

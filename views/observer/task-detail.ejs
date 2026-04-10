@@ -1,31 +1,44 @@
 <%- include("../partials/top", { title }) %>
 
 <section class="card">
-  <h1>Moje wykonania zadan</h1>
+  <h1>Zadanie (szablon): <%= task.title %></h1>
+  <p>
+    Organizacja:
+    <strong><%= task.organization_name %></strong>
+  </p>
+</section>
 
-  <% if (assignments.length === 0) { %>
-  <p>Nie masz jeszcze przydzielonych wykonan.</p>
+<section class="card">
+  <h2>Wykonania zadania</h2>
+
+  <% if (!assignments || assignments.length === 0) { %>
+  <p>To zadanie nie ma jeszcze zadnego wykonania.</p>
   <% } else { %>
   <table>
     <thead>
       <tr>
-        <th>Szablon zadania</th>
-        <th>Organizacja</th>
-        <th>Postep wykonania</th>
+        <th>Pracownik</th>
+        <th>Postep</th>
         <th>Status</th>
+        <th>Komentarze</th>
       </tr>
     </thead>
     <tbody>
       <% assignments.forEach((item) => { %>
       <tr>
-        <td><a href="/employee/tasks/<%= item.id %>"><%= item.title %></a></td>
-        <td><%= item.organization_name %></td>
+        <td>
+          <a href="/observer/tasks/<%= task.id %>/assignments/<%= item.id %>">
+            <%= item.employee_name %>
+          </a>
+          <div class="muted"><%= item.employee_email %></div>
+        </td>
         <td><%= item.completed_steps %>/<%= item.total_steps %> (<%= item.percentage %>%)</td>
         <td>
           <span class="badge <%= item.status === 'completed' ? 'badge--done' : 'badge--progress' %>">
             <%= item.status === "completed" ? "Ukonczone" : "W toku" %>
           </span>
         </td>
+        <td><%= item.comment_count || 0 %></td>
       </tr>
       <% }) %>
     </tbody>

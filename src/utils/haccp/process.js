@@ -1,179 +1,22 @@
-const fs = require("fs");
-const path = require("path");
-
-const { db } = require("../database");
-
-const FIELD_TYPES = ["BOOLEAN", "NUMBER", "TEXT", "SELECT"];
-const FREQUENCY_TYPES = ["NONE", "DAILY", "MULTIPLE_PER_DAY"];
-const ENTRY_STATUSES = ["OK", "ALERT", "CRITICAL"];
-
-function getPdfDocumentConstructor() {
-  try {
-    return require("pdfkit");
-  } catch (error) {
-    error.message = `Nie mozna zaladowac biblioteki PDF (pdfkit): ${error.message}`;
-    throw error;
-  }
-}
-
-function toArray(value) {
-  if (Array.isArray(value)) {
-    return value;
-  }
-  if (value == null) {
-    return [];
-  }
-  return [value];
-}
-
-function parseInteger(value) {
-  const candidate = Array.isArray(value) ? value[value.length - 1] : value;
-  const parsed = Number.parseInt(String(candidate || "").trim(), 10);
-  return Number.isInteger(parsed) ? parsed : null;
-}
-
-function parseDecimal(value) {
-  const candidate = Array.isArray(value) ? value[value.length - 1] : value;
-  if (candidate == null || String(candidate).trim() === "") {
-    return null;
-  }
-  const parsed = Number.parseFloat(String(candidate).replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parseBoolean(value) {
-  const candidate = Array.isArray(value) ? value[value.length - 1] : value;
-  const normalized = String(candidate || "")
-    .trim()
-    .toLowerCase();
-  return ["1", "true", "yes", "on", "tak"].includes(normalized);
-}
-
-function normalizeText(value) {
-  return String(value || "").trim();
-}
-
-function normalizeDate(value) {
-  const trimmed = normalizeText(value);
-  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
-}
-
-function escapeCsv(value) {
-  const text = String(value == null ? "" : value);
-  if (/[",\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-}
-
-function normalizePdfText(value) {
-  return String(value == null ? "" : value)
-    .replace(/[^\x20-\x7E]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function escapePdfText(value) {
-  return normalizePdfText(value)
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)");
-}
-
-function getSeverityForStatus(status) {
-  if (status === "CRITICAL") {
-    return "HIGH";
-  }
-  if (status === "ALERT") {
-    return "MEDIUM";
-  }
-  return "LOW";
-}
-
-function serializeJson(value) {
-  return JSON.stringify(value == null ? null : value);
-}
-
-async function createAuditLog({
-  organizationId = null,
-  entityType,
-  entityId,
-  action,
-  oldValue = null,
-  newValue = null,
-  createdBy = null,
-}) {
-  await db.run(
-    `
-    INSERT INTO haccp_audit_logs (
-      organization_id,
-      entity_type,
-      entity_id,
-      action,
-      old_value,
-      new_value,
-      created_by
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      organizationId,
-      entityType,
-      entityId,
-      action,
-      serializeJson(oldValue),
-      serializeJson(newValue),
-      createdBy,
-    ]
-  );
-}
-
-async function notifyManagers(organizationId, title, message, url = null) {
-  const managers = await db.all(
-    `
-    SELECT DISTINCT
-      u.id
-    FROM users u
-    JOIN user_organizations uo ON uo.user_id = u.id
-    WHERE
-      uo.organization_id = ?
-      AND u.role = 'manager'
-      AND u.is_active = 1
-    `,
-    [organizationId]
-  );
-
-  for (let index = 0; index < managers.length; index += 1) {
-    await db.run(
-      `
-      INSERT INTO notifications (user_id, type, title, message, url)
-      VALUES (?, 'haccp', ?, ?, ?)
-      `,
-      [managers[index].id, title, message, url]
-    );
-  }
-}
-
-function normalizeFrequencyType(value) {
-  const normalized = String(value || "NONE")
-    .trim()
-    .toUpperCase();
-  return FREQUENCY_TYPES.includes(normalized) ? normalized : "NONE";
-}
-
-function normalizeFieldType(value) {
-  const normalized = String(value || "")
-    .trim()
-    .toUpperCase();
-  return FIELD_TYPES.includes(normalized) ? normalized : null;
-}
-
-function normalizeAllowedValues(rawValue) {
-  return String(rawValue || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+const { db } = require("../../database");
+const {
+  FIELD_TYPES,
+  FREQUENCY_TYPES,
+  ENTRY_STATUSES,
+  toArray,
+  parseInteger,
+  parseDecimal,
+  parseBoolean,
+  normalizeText,
+  normalizeDate,
+  normalizeRecordedForAt,
+  getSeverityForStatus,
+  createAuditLog,
+  notifyManagers,
+  normalizeFrequencyType,
+  normalizeFieldType,
+  normalizeAllowedValues,
+} = require("./shared");
 
 function parseFieldsFromForm(body) {
   const names = toArray(body.fieldName);
@@ -752,11 +595,17 @@ function normalizeEntryPayload(processDefinition, body) {
   return { values, status, errors, deviations };
 }
 
-async function createEntry({ organizationId, processId, userId, body }) {
+async function createEntry({
+  organizationId,
+  processId,
+  userId,
+  body,
+  allowInactiveProcess = false,
+}) {
   const processDefinition = await getProcessWithFields(
     processId,
     organizationId,
-    true
+    !allowInactiveProcess
   );
   if (!processDefinition) {
     return {
@@ -778,6 +627,16 @@ async function createEntry({ organizationId, processId, userId, body }) {
   }
 
   const correctiveAction = normalizeText(body.correctiveAction);
+  const recordedForAt = normalizeRecordedForAt(body.recordedForAt);
+  if (body.recordedForAt && !recordedForAt) {
+    return {
+      ok: false,
+      errors: ["Podaj poprawna date i godzine, dla ktorej wpis ma zastosowanie."],
+      process: processDefinition,
+      entryValidation,
+    };
+  }
+
   if (entryValidation.status !== "OK" && !correctiveAction) {
     return {
       ok: false,
@@ -797,11 +656,18 @@ async function createEntry({ organizationId, processId, userId, body }) {
         process_id,
         organization_id,
         created_by,
-        status
+        status,
+        recorded_for_at
       )
-      VALUES (?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
       `,
-      [processId, organizationId, userId, entryValidation.status]
+      [
+        processId,
+        organizationId,
+        userId,
+        entryValidation.status,
+        recordedForAt,
+      ]
     );
 
     for (let index = 0; index < entryValidation.values.length; index += 1) {
@@ -864,6 +730,7 @@ async function createEntry({ organizationId, processId, userId, body }) {
       newValue: {
         status: entryValidation.status,
         values: entryValidation.values,
+        recorded_for_at: recordedForAt,
       },
       createdBy: userId,
     });
@@ -917,109 +784,11 @@ async function createEntry({ organizationId, processId, userId, body }) {
       entryId: createdEntry.lastID,
       status: entryValidation.status,
       process: processDefinition,
+      recordedForAt,
     };
   } catch (error) {
     await db.run("ROLLBACK");
     throw error;
-  }
-}
-
-async function ensureMissingEntryAlerts(organizationId, createdBy = null) {
-  const targetDateRow = await db.get("SELECT date('now', '-1 day') AS target_date");
-  const targetDate = targetDateRow?.target_date;
-  if (!targetDate) {
-    return;
-  }
-
-  const processes = await db.all(
-    `
-    SELECT
-      id,
-      name,
-      frequency_type,
-      frequency_value,
-      created_at
-    FROM haccp_processes
-    WHERE
-      organization_id = ?
-      AND is_active = 1
-      AND frequency_type IN ('DAILY', 'MULTIPLE_PER_DAY')
-      AND date(created_at) <= ?
-    ORDER BY id ASC
-    `,
-    [organizationId, targetDate]
-  );
-
-  for (let index = 0; index < processes.length; index += 1) {
-    const process = processes[index];
-    const requiredCount =
-      process.frequency_type === "MULTIPLE_PER_DAY"
-        ? Math.max(parseInteger(process.frequency_value) || 1, 1)
-        : Math.max(parseInteger(process.frequency_value) || 1, 1);
-
-    const entryCountRow = await db.get(
-      `
-      SELECT COUNT(*) AS total
-      FROM haccp_process_entries
-      WHERE process_id = ? AND date(created_at) = ?
-      `,
-      [process.id, targetDate]
-    );
-    const executedCount = Number(entryCountRow?.total || 0);
-    if (executedCount >= requiredCount) {
-      continue;
-    }
-
-    const dedupeKey = `missing:${process.id}:${targetDate}`;
-    const existing = await db.get(
-      `
-      SELECT id
-      FROM haccp_alerts
-      WHERE dedupe_key = ?
-      `,
-      [dedupeKey]
-    );
-    if (existing) {
-      continue;
-    }
-
-    const severity = requiredCount - executedCount > 1 ? "HIGH" : "MEDIUM";
-    const message = `Brak wpisu HACCP: proces "${process.name}" dnia ${targetDate} (wymagane ${requiredCount}, wykonane ${executedCount}).`;
-    const created = await db.run(
-      `
-      INSERT INTO haccp_alerts (
-        organization_id,
-        process_id,
-        severity,
-        message,
-        alert_type,
-        dedupe_key
-      )
-      VALUES (?, ?, ?, ?, 'MISSING_ENTRY', ?)
-      `,
-      [organizationId, process.id, severity, message, dedupeKey]
-    );
-
-    await createAuditLog({
-      organizationId,
-      entityType: "Alert",
-      entityId: created.lastID,
-      action: "CREATE",
-      oldValue: null,
-      newValue: {
-        severity,
-        message,
-        alertType: "MISSING_ENTRY",
-      },
-      createdBy,
-    });
-
-    await notifyManagers(
-      organizationId,
-      "HACCP: brak wpisu",
-      message,
-      "/manager/haccp/alerts"
-    );
   }
 }
 
@@ -1046,11 +815,11 @@ async function listEntriesForManager(organizationId, filters = {}) {
   const params = [organizationId];
 
   if (filters.dateFrom) {
-    where.push("date(e.created_at) >= ?");
+    where.push("date(COALESCE(e.recorded_for_at, e.created_at)) >= ?");
     params.push(filters.dateFrom);
   }
   if (filters.dateTo) {
-    where.push("date(e.created_at) <= ?");
+    where.push("date(COALESCE(e.recorded_for_at, e.created_at)) <= ?");
     params.push(filters.dateTo);
   }
   if (filters.status) {
@@ -1072,6 +841,7 @@ async function listEntriesForManager(organizationId, filters = {}) {
       e.id,
       e.process_id,
       e.created_at,
+      e.recorded_for_at,
       e.created_by,
       e.status,
       e.is_reviewed,
@@ -1103,6 +873,7 @@ async function listEntriesForEmployee(userId) {
     SELECT
       e.id,
       e.created_at,
+      e.recorded_for_at,
       e.status,
       e.is_reviewed,
       e.reviewed_at,
@@ -1282,549 +1053,6 @@ async function reviewEntry({ organizationId, entryId, userId }) {
   return { ok: true };
 }
 
-function parseAlertFilters(query) {
-  const resolvedRaw = String(query.resolved || "").trim().toLowerCase();
-  if (resolvedRaw === "1" || resolvedRaw === "true") {
-    return { resolved: 1 };
-  }
-  if (resolvedRaw === "0" || resolvedRaw === "false") {
-    return { resolved: 0 };
-  }
-  return { resolved: null };
-}
-
-async function listAlertsForManager(organizationId, filters = { resolved: null }) {
-  const where = ["a.organization_id = ?"];
-  const params = [organizationId];
-
-  if (filters.resolved === 0 || filters.resolved === 1) {
-    where.push("a.resolved = ?");
-    params.push(filters.resolved);
-  }
-
-  return db.all(
-    `
-    SELECT
-      a.id,
-      a.entry_id,
-      a.process_id,
-      a.severity,
-      a.message,
-      a.alert_type,
-      a.created_at,
-      a.resolved,
-      a.resolved_at,
-      p.name AS process_name,
-      e.status AS entry_status,
-      u.name AS entry_author_name
-    FROM haccp_alerts a
-    LEFT JOIN haccp_processes p ON p.id = a.process_id
-    LEFT JOIN haccp_process_entries e ON e.id = a.entry_id
-    LEFT JOIN users u ON u.id = e.created_by
-    WHERE ${where.join(" AND ")}
-    ORDER BY a.resolved ASC, a.created_at DESC
-    LIMIT 500
-    `,
-    params
-  );
-}
-
-async function listAlertsForEmployee(userId) {
-  return db.all(
-    `
-    SELECT
-      a.id,
-      a.severity,
-      a.message,
-      a.created_at,
-      a.resolved,
-      a.resolved_at,
-      p.name AS process_name,
-      e.id AS entry_id
-    FROM haccp_alerts a
-    JOIN haccp_process_entries e ON e.id = a.entry_id
-    JOIN haccp_processes p ON p.id = e.process_id
-    WHERE e.created_by = ?
-    ORDER BY a.created_at DESC
-    LIMIT 200
-    `,
-    [userId]
-  );
-}
-
-async function resolveAlert({ organizationId, alertId, userId }) {
-  const alert = await db.get(
-    `
-    SELECT
-      id,
-      resolved,
-      resolved_at,
-      resolved_by
-    FROM haccp_alerts
-    WHERE id = ? AND organization_id = ?
-    `,
-    [alertId, organizationId]
-  );
-
-  if (!alert) {
-    return {
-      ok: false,
-      notFound: true,
-      error: "Nie znaleziono alertu.",
-    };
-  }
-  if (Number(alert.resolved) === 1) {
-    return {
-      ok: false,
-      error: "Alert jest juz rozwiazany.",
-    };
-  }
-
-  await db.run(
-    `
-    UPDATE haccp_alerts
-    SET
-      resolved = 1,
-      resolved_at = CURRENT_TIMESTAMP,
-      resolved_by = ?
-    WHERE id = ? AND organization_id = ?
-    `,
-    [userId, alertId, organizationId]
-  );
-
-  await createAuditLog({
-    organizationId,
-    entityType: "Alert",
-    entityId: alertId,
-    action: "UPDATE",
-    oldValue: alert,
-    newValue: {
-      ...alert,
-      resolved: 1,
-      resolved_by: userId,
-    },
-    createdBy: userId,
-  });
-
-  return { ok: true };
-}
-
-async function listReportRows(organizationId, filters = {}) {
-  const rows = await listEntriesForManager(organizationId, filters);
-  if (rows.length === 0) {
-    return [];
-  }
-
-  const processIds = Array.from(
-    new Set(
-      rows
-        .map((row) => Number(row.process_id))
-        .filter((processId) => Number.isInteger(processId))
-    )
-  );
-  const entryIds = rows
-    .map((row) => Number(row.id))
-    .filter((entryId) => Number.isInteger(entryId));
-
-  const fieldsByProcess = new Map();
-  if (processIds.length > 0) {
-    const processPlaceholders = processIds.map(() => "?").join(",");
-    const processFields = await db.all(
-      `
-      SELECT
-        id,
-        process_id,
-        name,
-        type,
-        required,
-        min_value,
-        max_value,
-        field_order
-      FROM haccp_process_fields
-      WHERE process_id IN (${processPlaceholders})
-      ORDER BY process_id ASC, field_order ASC, id ASC
-      `,
-      processIds
-    );
-
-    for (let index = 0; index < processFields.length; index += 1) {
-      const field = processFields[index];
-      const processId = Number(field.process_id);
-      if (!fieldsByProcess.has(processId)) {
-        fieldsByProcess.set(processId, []);
-      }
-      fieldsByProcess.get(processId).push(field);
-    }
-  }
-
-  const valuesByEntry = new Map();
-  if (entryIds.length > 0) {
-    const entryPlaceholders = entryIds.map(() => "?").join(",");
-    const entryValues = await db.all(
-      `
-      SELECT
-        entry_id,
-        field_id,
-        value
-      FROM haccp_process_entry_values
-      WHERE entry_id IN (${entryPlaceholders})
-      ORDER BY entry_id ASC, field_id ASC
-      `,
-      entryIds
-    );
-
-    for (let index = 0; index < entryValues.length; index += 1) {
-      const valueRow = entryValues[index];
-      const entryId = Number(valueRow.entry_id);
-      const fieldId = Number(valueRow.field_id);
-      if (!valuesByEntry.has(entryId)) {
-        valuesByEntry.set(entryId, new Map());
-      }
-      valuesByEntry.get(entryId).set(fieldId, valueRow.value);
-    }
-  }
-
-  const grouped = new Map();
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index];
-    const processId = Number(row.process_id);
-    if (!grouped.has(processId)) {
-      grouped.set(processId, {
-        processId,
-        processName: row.process_name,
-        isCcp: Number(row.is_ccp) === 1,
-        fields: fieldsByProcess.get(processId) || [],
-        rows: [],
-      });
-    }
-
-    const group = grouped.get(processId);
-    const fieldValuesMap = valuesByEntry.get(Number(row.id)) || new Map();
-    const fieldValues = {};
-    for (let fieldIndex = 0; fieldIndex < group.fields.length; fieldIndex += 1) {
-      const field = group.fields[fieldIndex];
-      fieldValues[field.id] = fieldValuesMap.has(field.id)
-        ? fieldValuesMap.get(field.id)
-        : null;
-    }
-
-    group.rows.push({
-      ...row,
-      detailsUrl: `/manager/haccp/entries/${row.id}`,
-      fieldValues,
-    });
-  }
-
-  return Array.from(grouped.values()).sort((left, right) =>
-    String(left.processName || "").localeCompare(String(right.processName || ""), "pl", {
-      sensitivity: "base",
-    })
-  );
-}
-
-function formatFieldValueForReport(value, fieldType, emptyPlaceholder = "") {
-  if (value == null || String(value) === "") {
-    return emptyPlaceholder;
-  }
-  if (String(fieldType || "").toUpperCase() === "BOOLEAN") {
-    return parseBoolean(value) ? "TAK" : "NIE";
-  }
-  return String(value);
-}
-
-function buildCsvReport(reportGroups = []) {
-  if (!Array.isArray(reportGroups) || reportGroups.length === 0) {
-    return "entry_id,status,created_at,created_by,is_reviewed,reviewed_at,corrective_actions";
-  }
-
-  const lines = [];
-  for (let groupIndex = 0; groupIndex < reportGroups.length; groupIndex += 1) {
-    const group = reportGroups[groupIndex];
-    lines.push(escapeCsv(`Proces: ${group.processName || "-"}`));
-
-    const headers = [
-      "entry_id",
-      "status",
-      "created_at",
-      "created_by",
-      "is_reviewed",
-      "reviewed_at",
-      "corrective_actions",
-      ...group.fields.map((field) => field.name),
-    ];
-    lines.push(headers.map((header) => escapeCsv(header)).join(","));
-
-    for (let rowIndex = 0; rowIndex < group.rows.length; rowIndex += 1) {
-      const row = group.rows[rowIndex];
-      const baseColumns = [
-        row.id,
-        row.status || "",
-        row.created_at || "",
-        row.created_by_name || "",
-        Number(row.is_reviewed) === 1 ? "1" : "0",
-        row.reviewed_at || "",
-        row.corrective_action_text || "",
-      ];
-      const fieldColumns = group.fields.map((field) =>
-        formatFieldValueForReport(
-          row.fieldValues ? row.fieldValues[field.id] : null,
-          field.type,
-          ""
-        )
-      );
-      lines.push([...baseColumns, ...fieldColumns].map((value) => escapeCsv(value)).join(","));
-    }
-
-    if (groupIndex < reportGroups.length - 1) {
-      lines.push("");
-    }
-  }
-
-  return lines.join("\n");
-}
-
-function resolvePdfFontPath() {
-  const configuredPath = normalizeText(process.env.HACCP_PDF_FONT_PATH);
-  const candidates = [
-    configuredPath,
-    path.join(process.cwd(), "assets", "fonts", "NotoSans-Regular.ttf"),
-    path.join(process.cwd(), "assets", "fonts", "DejaVuSans.ttf"),
-    "C:\\Windows\\Fonts\\arial.ttf",
-    "C:\\Windows\\Fonts\\segoeui.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-  ];
-
-  for (let index = 0; index < candidates.length; index += 1) {
-    const candidate = candidates[index];
-    if (!candidate) {
-      continue;
-    }
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function getPdfColumnDefinitions(group) {
-  return [
-    { key: "id", label: "ID", weight: 0.8, align: "left" },
-    { key: "status", label: "Status", weight: 1.1, align: "left" },
-    { key: "created_by_name", label: "Autor", weight: 1.8, align: "left" },
-    { key: "created_at", label: "Data", weight: 1.4, align: "left" },
-    { key: "review", label: "Review", weight: 1.1, align: "left" },
-    { key: "corrective_action_text", label: "Działania korygujące", weight: 2.6, align: "left" },
-    ...group.fields.map((field) => ({
-      key: `field_${field.id}`,
-      label: field.name,
-      weight: 1.5,
-      align: "left",
-      field,
-    })),
-  ];
-}
-
-function getPdfCellValue(row, column) {
-  if (column.key === "id") {
-    return String(row.id || "");
-  }
-  if (column.key === "review") {
-    return Number(row.is_reviewed) === 1 ? "TAK" : "NIE";
-  }
-  if (column.field) {
-    return formatFieldValueForReport(
-      row.fieldValues ? row.fieldValues[column.field.id] : null,
-      column.field.type,
-      "-"
-    );
-  }
-  return formatFieldValueForReport(row[column.key], "TEXT", "-");
-}
-
-async function buildPdfReport(reportGroups = [], filters = {}) {
-  const PDFDocument = getPdfDocumentConstructor();
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({
-      size: "A4",
-      layout: "landscape",
-      margin: 36,
-      info: {
-        Title: "Raport HACCP",
-        Subject: "Raport HACCP",
-      },
-    });
-    const chunks = [];
-
-    doc.on("data", (chunk) => {
-      chunks.push(chunk);
-    });
-    doc.on("end", () => {
-      resolve(Buffer.concat(chunks));
-    });
-    doc.on("error", (error) => {
-      reject(error);
-    });
-
-    const regularFontPath = resolvePdfFontPath();
-    if (regularFontPath) {
-      doc.font(regularFontPath);
-    } else {
-      doc.font("Helvetica");
-    }
-
-    const left = doc.page.margins.left;
-    const right = doc.page.margins.right;
-    const top = doc.page.margins.top;
-    const bottom = doc.page.margins.bottom;
-    const rowCellPadding = 4;
-    const pageBottom = () => doc.page.height - bottom;
-    const contentWidth = () => doc.page.width - left - right;
-    let cursorY = top;
-
-    const setFontSize = (size) => {
-      doc.fontSize(size);
-      if (regularFontPath) {
-        doc.font(regularFontPath);
-      }
-    };
-
-    const addPage = () => {
-      doc.addPage();
-      if (regularFontPath) {
-        doc.font(regularFontPath);
-      }
-      cursorY = top;
-    };
-
-    const ensureSpace = (requiredHeight) => {
-      if (cursorY + requiredHeight > pageBottom()) {
-        addPage();
-      }
-    };
-
-    const writeLine = (text, options = {}) => {
-      const size = options.fontSize || 10;
-      const spacingAfter = options.spacingAfter == null ? 4 : options.spacingAfter;
-      setFontSize(size);
-      const height = doc.heightOfString(String(text || ""), {
-        width: contentWidth(),
-      });
-      ensureSpace(height + spacingAfter);
-      doc.text(String(text || ""), left, cursorY, {
-        width: contentWidth(),
-        align: options.align || "left",
-      });
-      cursorY += height + spacingAfter;
-    };
-
-    const calculateColumnWidths = (columns) => {
-      const weightsSum = columns.reduce((sum, column) => sum + column.weight, 0);
-      const widths = columns.map((column) =>
-        (contentWidth() * column.weight) / Math.max(weightsSum, 1)
-      );
-      return widths;
-    };
-
-    const getRowHeight = (columns, widths, values, fontSize) => {
-      setFontSize(fontSize);
-      let maxHeight = 0;
-      for (let index = 0; index < columns.length; index += 1) {
-        const value = String(values[index] == null ? "" : values[index]);
-        const textHeight = doc.heightOfString(value, {
-          width: Math.max(widths[index] - rowCellPadding * 2, 12),
-          align: columns[index].align || "left",
-        });
-        if (textHeight > maxHeight) {
-          maxHeight = textHeight;
-        }
-      }
-      return maxHeight + rowCellPadding * 2;
-    };
-
-    const drawRow = (columns, widths, values, options = {}) => {
-      const isHeader = Boolean(options.isHeader);
-      const fontSize = isHeader ? 9 : 8.5;
-      const rowHeight = getRowHeight(columns, widths, values, fontSize);
-      ensureSpace(rowHeight);
-
-      let cursorX = left;
-      for (let index = 0; index < columns.length; index += 1) {
-        const width = widths[index];
-        const text = String(values[index] == null ? "" : values[index]);
-        doc
-          .lineWidth(0.7)
-          .fillColor(isHeader ? "#eef4ff" : "#ffffff")
-          .strokeColor("#d6deea")
-          .rect(cursorX, cursorY, width, rowHeight)
-          .fillAndStroke();
-
-        setFontSize(fontSize);
-        doc.fillColor("#18202a").text(text, cursorX + rowCellPadding, cursorY + rowCellPadding, {
-          width: Math.max(width - rowCellPadding * 2, 12),
-          align: columns[index].align || "left",
-        });
-        cursorX += width;
-      }
-
-      cursorY += rowHeight;
-    };
-
-    const totalRows = Array.isArray(reportGroups)
-      ? reportGroups.reduce((sum, group) => sum + (group.rows?.length || 0), 0)
-      : 0;
-
-    writeLine("Raport HACCP", { fontSize: 15, spacingAfter: 8 });
-    writeLine(
-      `Zakres dat: ${filters.dateFrom || "brak"} - ${filters.dateTo || "brak"}`,
-      { fontSize: 10, spacingAfter: 2 }
-    );
-    if (filters.status) {
-      writeLine(`Status: ${filters.status}`, { fontSize: 10, spacingAfter: 2 });
-    }
-    if (filters.processId) {
-      writeLine(`Proces (ID): ${filters.processId}`, { fontSize: 10, spacingAfter: 2 });
-    }
-    writeLine(`Liczba wpisów: ${totalRows}`, { fontSize: 10, spacingAfter: 8 });
-
-    if (!Array.isArray(reportGroups) || reportGroups.length === 0) {
-      writeLine("Brak danych dla podanych filtrów.", { fontSize: 11, spacingAfter: 0 });
-      doc.end();
-      return;
-    }
-
-    for (let groupIndex = 0; groupIndex < reportGroups.length; groupIndex += 1) {
-      const group = reportGroups[groupIndex];
-      const groupTitle = `Proces: ${group.processName || "-"}${group.isCcp ? " (CCP)" : ""}`;
-      writeLine(groupTitle, { fontSize: 11, spacingAfter: 4 });
-
-      const columns = getPdfColumnDefinitions(group);
-      const widths = calculateColumnWidths(columns);
-      const headerValues = columns.map((column) => column.label);
-      drawRow(columns, widths, headerValues, { isHeader: true });
-
-      for (let rowIndex = 0; rowIndex < group.rows.length; rowIndex += 1) {
-        const row = group.rows[rowIndex];
-        const values = columns.map((column) => getPdfCellValue(row, column));
-        const expectedHeight = getRowHeight(columns, widths, values, 8.5);
-        if (cursorY + expectedHeight > pageBottom()) {
-          addPage();
-          writeLine(`${groupTitle} (cd.)`, { fontSize: 11, spacingAfter: 4 });
-          drawRow(columns, widths, headerValues, { isHeader: true });
-        }
-        drawRow(columns, widths, values, { isHeader: false });
-      }
-
-      if (groupIndex < reportGroups.length - 1) {
-        cursorY += 8;
-      }
-    }
-
-    doc.end();
-  });
-}
-
 async function getManagerDashboardStats(organizationId) {
   const [processes, entriesToday, openAlerts, criticalAlerts] = await Promise.all([
     db.get(
@@ -1839,7 +1067,7 @@ async function getManagerDashboardStats(organizationId) {
       `
       SELECT COUNT(*) AS total
       FROM haccp_process_entries
-      WHERE organization_id = ? AND date(created_at) = date('now')
+      WHERE organization_id = ? AND date(COALESCE(recorded_for_at, created_at)) = date('now')
       `,
       [organizationId]
     ),
@@ -1870,27 +1098,16 @@ async function getManagerDashboardStats(organizationId) {
 }
 
 module.exports = {
-  FIELD_TYPES,
-  FREQUENCY_TYPES,
-  ENTRY_STATUSES,
   parseProcessPayload,
   parseEntryFilters,
-  parseAlertFilters,
   listProcesses,
   getProcessWithFields,
   createProcess,
   updateProcess,
   createEntry,
-  ensureMissingEntryAlerts,
   listEntriesForManager,
   listEntriesForEmployee,
   getEntryWithDetails,
   reviewEntry,
-  listAlertsForManager,
-  listAlertsForEmployee,
-  resolveAlert,
-  listReportRows,
-  buildCsvReport,
-  buildPdfReport,
   getManagerDashboardStats,
 };

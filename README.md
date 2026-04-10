@@ -14,11 +14,13 @@ Aplikacja webowa z trzema rolami:
   - tworzy lokalne konta pracownikow i automatycznie przypisuje je do aktywnej organizacji,
   - tworzy, kopiuje, edytuje i usuwa zadania tylko w aktywnej organizacji,
   - przydziela zadania pracownikom nalezacym do tej samej organizacji,
-  - sledzi postep i zdjecia dowodowe.
+  - sledzi postep i zdjecia dowodowe,
+  - zarzadza procesami HACCP, alertami i raportami.
 - `employee`:
   - przeglada swoje przydzielone zadania (takze z wielu organizacji),
   - odznacza czynnosci jako ukonczone,
-  - dodaje zdjecia jako dowody wykonania.
+  - dodaje zdjecia jako dowody wykonania,
+  - wykonuje wpisy HACCP dla aktywnych procesow.
 
 ## Autoryzacja
 
@@ -92,6 +94,15 @@ npm start
 - Kierownik moze nalezec do wielu organizacji i przelaczac tenant z poziomu naglowka.
 - Pracownik moze nalezec do wielu organizacji i widzi swoje zadania z przypisanych tenantow.
 
+## Domeny funkcjonalne
+
+System dziala w dwoch glownych domenach biznesowych:
+
+- Modul zadan definiowanych przez kierownika: szablony zadan, przydzialy, postep, dowody wykonania, komentarze.
+- Modul zadan definiowanych przez kierownika - glowne sciezki: `/manager/tasks`, `/manager/assignments`, `/employee/tasks`, `/observer/tasks`.
+- Modul HACCP: procesy HACCP, wpisy pomiarowe, alerty, dzialania korygujace, raporty i audyt.
+- Modul HACCP - glowne sciezki: `/manager/haccp/*`, `/employee/haccp/*`.
+
 ## Struktura danych
 
 - `users`
@@ -103,6 +114,14 @@ npm start
 - `assignment_steps`
 - `step_evidence`
 - `notifications`
+- `task_comments`
+- `haccp_processes`
+- `haccp_process_fields`
+- `haccp_process_entries`
+- `haccp_process_entry_values`
+- `haccp_corrective_actions`
+- `haccp_alerts`
+- `haccp_audit_logs`
 
 ## Uwagi produkcyjne
 

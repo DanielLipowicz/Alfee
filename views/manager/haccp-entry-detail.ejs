@@ -12,7 +12,8 @@
       <p><strong>Proces:</strong> <%= details.entry.process_name %></p>
       <p><strong>Status:</strong> <span class="badge badge--<%= String(details.entry.status || '').toLowerCase() %>"><%= details.entry.status %></span></p>
       <p><strong>Autor:</strong> <%= details.entry.created_by_name %></p>
-      <p><strong>Data:</strong> <%= details.entry.created_at %></p>
+      <p><strong>Utworzono:</strong> <%= details.entry.created_at %></p>
+      <p><strong>Dotyczy czasu:</strong> <%= details.entry.recorded_for_at || details.entry.created_at %></p>
       <p><strong>CCP:</strong> <%= Number(details.entry.is_ccp) === 1 ? "TAK" : "NIE" %></p>
       <p>
         <strong>Review:</strong>

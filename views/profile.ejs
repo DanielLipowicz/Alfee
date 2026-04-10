@@ -7,7 +7,7 @@
   <p><strong>Email logowania:</strong> <%= profileUser.email %></p>
   <p>
     <strong>Rola:</strong>
-    <%= profileUser.role === "admin" ? "administrator" : profileUser.role === "manager" ? "kierownik" : "pracownik" %>
+    <%= profileUser.role === "admin" ? "administrator" : profileUser.role === "manager" ? "kierownik" : profileUser.role === "observer" ? "obserwator" : "pracownik" %>
   </p>
 </section>
 

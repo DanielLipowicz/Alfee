@@ -1,17 +1,17 @@
 <%- include("../partials/top", { title }) %>
 
 <section class="card">
-  <h1>Przydzielone zadania</h1>
+  <h1>Wykonania zadan</h1>
 
   <% if (assignments.length === 0) { %>
-  <p>Brak przydzielonych zadań.</p>
+  <p>Brak wykonan zadan.</p>
   <% } else { %>
   <table>
     <thead>
       <tr>
-        <th>Zadanie</th>
+        <th>Szablon zadania</th>
         <th>Pracownik</th>
-        <th>Postęp</th>
+        <th>Postep wykonania</th>
         <th>Status</th>
       </tr>
     </thead>
@@ -23,7 +23,7 @@
         <td><%= item.completed_steps %>/<%= item.total_steps %> (<%= item.percentage %>%)</td>
         <td>
           <span class="badge <%= item.status === 'completed' ? 'badge--done' : 'badge--progress' %>">
-            <%= item.status === "completed" ? "Ukończone" : "W toku" %>
+            <%= item.status === "completed" ? "Ukonczone" : "W toku" %>
           </span>
         </td>
       </tr>

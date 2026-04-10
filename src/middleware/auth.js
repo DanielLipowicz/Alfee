@@ -42,9 +42,20 @@ function ensureAdmin(req, res, next) {
   });
 }
 
+function ensureObserver(req, res, next) {
+  if (req.user?.role === "observer") {
+    return next();
+  }
+  return res.status(403).render("error", {
+    title: "Brak dostepu",
+    message: "Ta sekcja jest dostepna tylko dla obserwatora.",
+  });
+}
+
 module.exports = {
   ensureAuthenticated,
   ensureManager,
   ensureEmployee,
   ensureAdmin,
+  ensureObserver,
 };

@@ -12,8 +12,9 @@ const { db, initDatabase } = require("./src/database");
 const adminRoutes = require("./src/routes/adminRoutes");
 const managerRoutes = require("./src/routes/managerRoutes");
 const employeeRoutes = require("./src/routes/employeeRoutes");
-const haccpManagerRoutes = require("./src/routes/haccpManagerRoutes");
-const haccpEmployeeRoutes = require("./src/routes/haccpEmployeeRoutes");
+const observerRoutes = require("./src/routes/observerRoutes");
+const haccpManagerRoutes = require("./src/routes/haccp/managerRoutes");
+const haccpEmployeeRoutes = require("./src/routes/haccp/employeeRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const profileRoutes = require("./src/routes/profileRoutes");
 const { ensureAuthenticated } = require("./src/middleware/auth");
@@ -210,7 +211,7 @@ function isLocked(lockedUntil) {
 }
 
 async function ensureDefaultMembership(userId, role) {
-  if (role !== "manager" && role !== "employee") {
+  if (role !== "manager" && role !== "employee" && role !== "observer") {
     return;
   }
 
@@ -319,7 +320,9 @@ if (googleConfigured) {
               targetRole = "admin";
             } else if (shouldBeManager) {
               targetRole = "manager";
-            } else if (!["admin", "manager", "employee"].includes(user.role)) {
+            } else if (
+              !["admin", "manager", "employee", "observer"].includes(user.role)
+            ) {
               targetRole = "employee";
             }
 
@@ -387,6 +390,9 @@ function redirectByRole(req, res) {
   }
   if (req.user.role === "manager") {
     return res.redirect("/manager/dashboard");
+  }
+  if (req.user.role === "observer") {
+    return res.redirect("/observer/tasks");
   }
   return res.redirect("/employee/tasks");
 }
@@ -682,6 +688,7 @@ app.use("/manager/haccp", haccpManagerRoutes);
 app.use("/manager", managerRoutes);
 app.use("/employee/haccp", haccpEmployeeRoutes);
 app.use("/employee", employeeRoutes);
+app.use("/observer", observerRoutes);
 app.use("/notifications", notificationRoutes);
 app.use("/profile", profileRoutes);
 

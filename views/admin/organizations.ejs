@@ -3,7 +3,7 @@
 <section class="card">
   <h1>Organizacje</h1>
   <p class="muted">
-    Administrator tworzy organizacje i przypisuje do nich kierownikow oraz pracownikow.
+    Administrator tworzy organizacje i przypisuje do nich kierownikow, pracownikow oraz obserwatorow.
   </p>
   <% if (isAdminManagerMode && activeOrganization) { %>
   <p>
@@ -49,7 +49,7 @@
           <option value="">-- wybierz --</option>
           <% users.forEach((user) => { %>
           <option value="<%= user.id %>">
-            <%= user.name %> (<%= user.email %>) - <%= user.role === "manager" ? "kierownik" : "pracownik" %>
+            <%= user.name %> (<%= user.email %>) - <%= user.role === "manager" ? "kierownik" : user.role === "observer" ? "obserwator" : "pracownik" %>
           </option>
           <% }) %>
         </select>
@@ -79,12 +79,13 @@
       <tr>
         <td><%= user.name %> <span class="muted">(<%= user.email %>)</span></td>
         <td>
-          <%= user.role === "admin" ? "administrator" : user.role === "manager" ? "kierownik" : "pracownik" %>
+          <%= user.role === "admin" ? "administrator" : user.role === "manager" ? "kierownik" : user.role === "observer" ? "obserwator" : "pracownik" %>
         </td>
         <td>
           <form class="form-inline" method="POST" action="/admin/users/<%= user.id %>/role?_method=PUT">
             <select name="role" required>
               <option value="employee" <%= user.role === "employee" ? "selected" : "" %>>pracownik</option>
+              <option value="observer" <%= user.role === "observer" ? "selected" : "" %>>obserwator</option>
               <option value="manager" <%= user.role === "manager" ? "selected" : "" %>>kierownik</option>
               <option value="admin" <%= user.role === "admin" ? "selected" : "" %>>administrator</option>
             </select>
@@ -160,7 +161,7 @@
         <% members.forEach((member) => { %>
         <tr>
           <td><%= member.user_name %> <span class="muted">(<%= member.user_email %>)</span></td>
-          <td><%= member.user_role === "manager" ? "kierownik" : "pracownik" %></td>
+          <td><%= member.user_role === "manager" ? "kierownik" : member.user_role === "observer" ? "obserwator" : "pracownik" %></td>
           <td>
             <form
               method="POST"

@@ -13,6 +13,9 @@
     </span>
   </p>
   <p>Postep: <strong><%= progress.completed_steps %>/<%= progress.total_steps %> (<%= progress.percentage %>%)</strong></p>
+  <p>
+    <a href="/observer/tasks/<%= assignment.task_id %>">Wroc do zadania</a>
+  </p>
 </section>
 
 <section class="card">
@@ -47,8 +50,8 @@
 
 <%- include("../partials/task-comments", {
   comments,
-  commentAction: `/manager/assignments/${assignment.id}/comments`,
-  redirectTo: `/manager/assignments/${assignment.id}`,
+  commentAction: `/observer/assignments/${assignment.id}/comments`,
+  redirectTo: `/observer/tasks/${assignment.task_id}/assignments/${assignment.id}`,
 }) %>
 
 <%- include("../partials/bottom") %>
