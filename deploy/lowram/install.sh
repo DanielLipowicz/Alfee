@@ -12,6 +12,8 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 NODE_BIN="/usr/bin/node"
 RUN_USER="${SUDO_USER:-$USER}"
 RUN_GROUP="$(id -gn "$RUN_USER")"
+REQUIRED_NODE_VERSION="v18.9.1"
+REQUIRED_SQLITE3_VERSION="5.1.7"
 
 if [[ ! -f "${APP_DIR}/package.json" || ! -f "${APP_DIR}/server.js" ]]; then
   echo "ERROR: Run this script from inside the Alfee repository."
@@ -23,29 +25,47 @@ if ! command -v apt-get >/dev/null 2>&1; then
   exit 1
 fi
 
+verify_node_version() {
+  local current_node_version
+  current_node_version="$(node -v)"
+  if [[ "${current_node_version}" != "${REQUIRED_NODE_VERSION}" ]]; then
+    echo "ERROR: Required Node version is ${REQUIRED_NODE_VERSION}. Installed: ${current_node_version}"
+    exit 1
+  fi
+}
+
+ensure_sqlite3_compat() {
+  local installed_sqlite3_version
+  installed_sqlite3_version="$(node -p 'try { require("sqlite3/package.json").version } catch (_) { "" }')"
+  if [[ "${installed_sqlite3_version}" != "${REQUIRED_SQLITE3_VERSION}" ]]; then
+    echo "Installing sqlite3@${REQUIRED_SQLITE3_VERSION} for Node ${REQUIRED_NODE_VERSION} compatibility..."
+    npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
+  fi
+}
+
+npm_ci_prod() {
+  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
+  ensure_sqlite3_compat
+}
+
+verify_dependencies() {
+  node -e 'const pkg=require("./package.json"); const requiredSqliteVersion="5.1.7"; for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } const sqliteVersion=require("sqlite3/package.json").version; if (sqliteVersion !== requiredSqliteVersion) { console.error("sqlite3 version mismatch:", sqliteVersion, "required:", requiredSqliteVersion); process.exit(1); } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
+}
+
 echo "[1/7] Installing system dependencies..."
 sudo apt-get update
-sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg git nodejs npm python3 make g++
+sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg git python3 make g++
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "ERROR: node was not installed."
-  exit 1
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  sudo apt-get install -y --no-install-recommends nodejs npm
 fi
 
-NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
-if [[ "${NODE_MAJOR}" -lt 20 ]]; then
-  echo "[2/7] Node <20 detected, upgrading to Node 20 LTS..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  sudo apt-get install -y --no-install-recommends nodejs
-fi
+echo "[2/7] Verifying Node version..."
+verify_node_version
 
 echo "[3/7] Installing app dependencies (production only)..."
 cd "${APP_DIR}"
-npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
-
-verify_dependencies() {
-  node -e 'const pkg=require("./package.json"); for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
-}
+npm_ci_prod
 
 echo "[4/7] Creating runtime directories..."
 mkdir -p data uploads
@@ -57,8 +77,8 @@ fi
 
 echo "[6/7] Verifying installed modules..."
 if ! verify_dependencies; then
-  echo "sqlite3 load failed. Rebuilding sqlite3 from source for current Node..."
-  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm rebuild sqlite3 --build-from-source
+  echo "sqlite3 check failed. Reinstalling sqlite3@${REQUIRED_SQLITE3_VERSION}..."
+  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
   verify_dependencies
 fi
 

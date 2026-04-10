@@ -10,6 +10,8 @@ APP_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 SERVICE_NAME="alfee"
 INITD_FILE="/etc/init.d/${SERVICE_NAME}"
 CONF_FILE="/etc/conf.d/${SERVICE_NAME}"
+REQUIRED_NODE_VERSION="v18.9.1"
+REQUIRED_SQLITE3_VERSION="5.1.7"
 
 if [ ! -f "${APP_DIR}/package.json" ] || [ ! -f "${APP_DIR}/server.js" ]; then
   echo "ERROR: Run this script from inside the Alfee repository."
@@ -32,28 +34,44 @@ as_root() {
   fi
 }
 
-echo "[1/8] Installing system dependencies..."
-as_root apk add --no-cache ca-certificates curl git nodejs npm python3 build-base libstdc++ linux-headers
+verify_node_version() {
+  CURRENT_NODE_VERSION="$(node -v)"
+  if [ "${CURRENT_NODE_VERSION}" != "${REQUIRED_NODE_VERSION}" ]; then
+    echo "ERROR: Required Node version is ${REQUIRED_NODE_VERSION}. Installed: ${CURRENT_NODE_VERSION}"
+    exit 1
+  fi
+}
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "ERROR: node was not installed."
-  exit 1
+ensure_sqlite3_compat() {
+  INSTALLED_SQLITE3_VERSION="$(node -p 'try { require("sqlite3/package.json").version } catch (_) { "" }')"
+  if [ "${INSTALLED_SQLITE3_VERSION}" != "${REQUIRED_SQLITE3_VERSION}" ]; then
+    echo "Installing sqlite3@${REQUIRED_SQLITE3_VERSION} for Node ${REQUIRED_NODE_VERSION} compatibility..."
+    npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
+  fi
+}
+
+npm_ci_prod() {
+  npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
+  ensure_sqlite3_compat
+}
+
+verify_dependencies() {
+  node -e 'const pkg=require("./package.json"); const requiredSqliteVersion="5.1.7"; for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } const sqliteVersion=require("sqlite3/package.json").version; if (sqliteVersion !== requiredSqliteVersion) { console.error("sqlite3 version mismatch:", sqliteVersion, "required:", requiredSqliteVersion); process.exit(1); } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
+}
+
+echo "[1/8] Installing system dependencies..."
+as_root apk add --no-cache ca-certificates curl git python3 build-base libstdc++ linux-headers
+
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  as_root apk add --no-cache nodejs npm
 fi
 
 echo "[2/8] Verifying Node version..."
-NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
-if [ "${NODE_MAJOR}" -lt 20 ]; then
-  echo "ERROR: Node >= 20 is required. Installed: $(node -v)"
-  exit 1
-fi
+verify_node_version
 
 echo "[3/8] Installing app dependencies (production only)..."
 cd "${APP_DIR}"
-npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
-
-verify_dependencies() {
-  node -e 'const pkg=require("./package.json"); for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
-}
+npm_ci_prod
 
 echo "[4/8] Creating runtime directories..."
 mkdir -p data uploads
@@ -65,8 +83,8 @@ fi
 
 echo "[6/8] Verifying installed modules..."
 if ! verify_dependencies; then
-  echo "sqlite3 load failed. Rebuilding sqlite3 from source for current Node..."
-  npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm rebuild sqlite3 --build-from-source
+  echo "sqlite3 check failed. Reinstalling sqlite3@${REQUIRED_SQLITE3_VERSION}..."
+  npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
   verify_dependencies
 fi
 
