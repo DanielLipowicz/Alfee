@@ -46,7 +46,19 @@ ensure_sqlite3_compat() {
   INSTALLED_SQLITE3_VERSION="$(node -p 'try { require("sqlite3/package.json").version } catch (_) { "" }')"
   if [ "${INSTALLED_SQLITE3_VERSION}" != "${REQUIRED_SQLITE3_VERSION}" ]; then
     echo "Installing sqlite3@${REQUIRED_SQLITE3_VERSION} for Node ${REQUIRED_NODE_VERSION} compatibility..."
-    npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
+    npm_config_build_from_source=true npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
+  fi
+}
+
+rebuild_sqlite3_native() {
+  echo "Rebuilding sqlite3 native modules for Alpine/musl..."
+  npm_config_build_from_source=true npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm rebuild sqlite3 --build-from-source
+
+  if [ -d node_modules/connect-sqlite3/node_modules/sqlite3 ]; then
+    (
+      cd node_modules/connect-sqlite3/node_modules/sqlite3
+      npm_config_build_from_source=true npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm rebuild --build-from-source
+    )
   fi
 }
 
@@ -56,7 +68,7 @@ npm_ci_prod() {
 }
 
 verify_dependencies() {
-  node -e 'const pkg=require("./package.json"); const requiredSqliteVersion="5.1.7"; for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } const sqliteVersion=require("sqlite3/package.json").version; if (sqliteVersion !== requiredSqliteVersion) { console.error("sqlite3 version mismatch:", sqliteVersion, "required:", requiredSqliteVersion); process.exit(1); } try { require("sqlite3"); } catch (err) { console.error("sqlite3 load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
+  node -e 'const pkg=require("./package.json"); const requiredSqliteVersion="5.1.7"; for (const name of Object.keys(pkg.dependencies||{})) { try { require.resolve(name); } catch (err) { console.error("Missing dependency:", name); process.exit(1); } } const sqliteVersion=require("sqlite3/package.json").version; if (sqliteVersion !== requiredSqliteVersion) { console.error("sqlite3 version mismatch:", sqliteVersion, "required:", requiredSqliteVersion); process.exit(1); } try { const nestedVersion=require("connect-sqlite3/node_modules/sqlite3/package.json").version; if (nestedVersion !== requiredSqliteVersion) { console.error("connect-sqlite3 bundled sqlite3 mismatch:", nestedVersion, "required:", requiredSqliteVersion); process.exit(1); } } catch (_) {} try { require("sqlite3"); require("connect-sqlite3"); } catch (err) { console.error("sqlite modules load failed:", err.message); process.exit(1); } console.log("Dependency check OK");'
 }
 
 echo "[1/8] Installing system dependencies..."
@@ -83,8 +95,7 @@ fi
 
 echo "[6/8] Verifying installed modules..."
 if ! verify_dependencies; then
-  echo "sqlite3 check failed. Reinstalling sqlite3@${REQUIRED_SQLITE3_VERSION}..."
-  npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund "sqlite3@${REQUIRED_SQLITE3_VERSION}"
+  rebuild_sqlite3_native
   verify_dependencies
 fi
 
