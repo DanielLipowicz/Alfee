@@ -28,7 +28,7 @@ ensure_sqlite3_compat() {
 }
 
 npm_ci_prod() {
-  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
+  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm install --omit=dev --no-audit --no-fund
   ensure_sqlite3_compat
 }
 
@@ -54,10 +54,10 @@ elif ! verify_dependencies >/dev/null 2>&1; then
 fi
 
 if [[ -n "${REASON}" ]]; then
-  echo "${REASON}, running npm ci..."
+  echo "${REASON}, running npm install..."
   npm_ci_prod
 else
-  echo "package files unchanged and node_modules healthy, skipping npm ci."
+  echo "package files unchanged and node_modules healthy, skipping npm install."
   ensure_sqlite3_compat
 fi
 

@@ -12,8 +12,7 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=20.20.2 <21",
-    "npm": ">=10"
+    "node": "18.9.1"
   },
   "dependencies": {
     "connect-sqlite3": "^0.9.16",
@@ -26,11 +25,9 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pdfkit": "0.15.2",
-    "sqlite3": "^6.0.1"
+    "sqlite3": "5.1.7"
   },
   "overrides": {
-    "connect-sqlite3": {
-      "sqlite3": "^6.0.1"
-    }
+    "sqlite3": "5.1.7"
   }
 }

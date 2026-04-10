@@ -51,7 +51,7 @@ ensure_sqlite3_compat() {
 }
 
 npm_ci_prod() {
-  npm_config_target_libc=musl npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm ci --omit=dev --no-audit --no-fund
+  npm_config_target_libc=musl npm_config_jobs=1 npm_config_progress=false npm_config_loglevel=warn NODE_OPTIONS=--max-old-space-size=128 npm install --omit=dev --no-audit --no-fund
   ensure_sqlite3_compat
 }
 
@@ -86,7 +86,7 @@ if ! verify_dependencies; then
   echo "ERROR: sqlite modules are still incompatible on Alpine."
   echo "Try cleaning prebuild cache and reinstalling dependencies:"
   echo "  rm -rf node_modules ~/.npm/_prebuilds"
-  echo "  npm_config_target_libc=musl npm ci --omit=dev --no-audit --no-fund"
+  echo "  npm_config_target_libc=musl npm install --omit=dev --no-audit --no-fund"
   exit 1
 fi
 

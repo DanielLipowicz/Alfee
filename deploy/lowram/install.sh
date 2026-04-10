@@ -44,7 +44,7 @@ ensure_sqlite3_compat() {
 }
 
 npm_ci_prod() {
-  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm ci --omit=dev --no-audit --no-fund
+  npm_config_jobs=1 NODE_OPTIONS=--max-old-space-size=192 npm install --omit=dev --no-audit --no-fund
   ensure_sqlite3_compat
 }
 
