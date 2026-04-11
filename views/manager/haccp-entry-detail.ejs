@@ -26,6 +26,9 @@
 
     <article class="tenant-card">
       <h2>Akcje</h2>
+      <div class="actions">
+        <a class="btn" href="/manager/haccp/entries/<%= details.entry.id %>/edit">Edytuj wpis</a>
+      </div>
       <% if (Number(details.entry.is_reviewed) === 1) { %>
       <p>Wpis zostal juz zatwierdzony.</p>
       <% } else { %>

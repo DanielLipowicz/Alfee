@@ -1028,6 +1028,269 @@ async function createEntry({
   }
 }
 
+async function updateEntryByManager({
+  organizationId,
+  entryId,
+  userId,
+  body,
+}) {
+  const entry = await db.get(
+    `
+    SELECT
+      id,
+      process_id,
+      organization_id,
+      status,
+      recorded_for_at,
+      is_reviewed,
+      reviewed_by,
+      reviewed_at
+    FROM haccp_process_entries
+    WHERE id = ? AND organization_id = ?
+    `,
+    [entryId, organizationId]
+  );
+
+  if (!entry) {
+    return {
+      ok: false,
+      notFound: true,
+      errors: ["Nie znaleziono wpisu HACCP."],
+    };
+  }
+
+  const processDefinition = await getProcessWithFields(
+    Number(entry.process_id),
+    organizationId,
+    false
+  );
+
+  if (!processDefinition) {
+    return {
+      ok: false,
+      errors: ["Proces powiazany z wpisem nie jest dostepny."],
+      process: null,
+    };
+  }
+
+  const entryValidation = normalizeEntryPayload(processDefinition, body);
+  if (entryValidation.errors.length > 0) {
+    return {
+      ok: false,
+      errors: entryValidation.errors,
+      process: processDefinition,
+      entryValidation,
+    };
+  }
+
+  const recordedForAt = normalizeRecordedForAt(body.recordedForAt);
+  if (body.recordedForAt && !recordedForAt) {
+    return {
+      ok: false,
+      errors: ["Podaj poprawna date i godzine, dla ktorej wpis ma zastosowanie."],
+      process: processDefinition,
+      entryValidation,
+    };
+  }
+
+  const correctiveAction = normalizeText(body.correctiveAction);
+  const existingCorrectiveActionsCount = await db.get(
+    `
+    SELECT COUNT(*) AS total
+    FROM haccp_corrective_actions
+    WHERE entry_id = ?
+    `,
+    [entry.id]
+  );
+  const hasExistingCorrectiveAction =
+    Number(existingCorrectiveActionsCount?.total || 0) > 0;
+
+  if (
+    entryValidation.status !== "OK" &&
+    !correctiveAction &&
+    !hasExistingCorrectiveAction
+  ) {
+    return {
+      ok: false,
+      errors: [
+        "Dla wpisu z ALERT/CRITICAL wymagane jest dzialanie korygujace.",
+      ],
+      process: processDefinition,
+      entryValidation,
+    };
+  }
+
+  const oldValues = await db.all(
+    `
+    SELECT field_id, value
+    FROM haccp_process_entry_values
+    WHERE entry_id = ?
+    ORDER BY field_id ASC
+    `,
+    [entry.id]
+  );
+
+  await db.run("BEGIN TRANSACTION");
+  try {
+    await db.run(
+      `
+      UPDATE haccp_process_entries
+      SET
+        status = ?,
+        recorded_for_at = COALESCE(?, recorded_for_at),
+        is_reviewed = 0,
+        reviewed_by = NULL,
+        reviewed_at = NULL
+      WHERE id = ? AND organization_id = ?
+      `,
+      [entryValidation.status, recordedForAt, entry.id, organizationId]
+    );
+
+    await db.run("DELETE FROM haccp_process_entry_values WHERE entry_id = ?", [
+      entry.id,
+    ]);
+
+    for (let index = 0; index < entryValidation.values.length; index += 1) {
+      const item = entryValidation.values[index];
+      await db.run(
+        `
+        INSERT INTO haccp_process_entry_values (entry_id, field_id, value)
+        VALUES (?, ?, ?)
+        `,
+        [entry.id, item.fieldId, item.value]
+      );
+    }
+
+    let correctiveActionId = null;
+    if (correctiveAction) {
+      const corrective = await db.run(
+        `
+        INSERT INTO haccp_corrective_actions (entry_id, description, created_by)
+        VALUES (?, ?, ?)
+        `,
+        [entry.id, correctiveAction, userId]
+      );
+      correctiveActionId = corrective.lastID;
+    }
+
+    await db.run(
+      `
+      UPDATE haccp_alerts
+      SET
+        resolved = 1,
+        resolved_at = COALESCE(resolved_at, CURRENT_TIMESTAMP),
+        resolved_by = COALESCE(resolved_by, ?)
+      WHERE
+        entry_id = ?
+        AND alert_type = 'ENTRY_DEVIATION'
+        AND resolved = 0
+      `,
+      [userId, entry.id]
+    );
+
+    let alertId = null;
+    if (entryValidation.status !== "OK") {
+      const alertMessage = entryValidation.deviations
+        .map((item) => item.message)
+        .join(" ");
+      const createdAlert = await db.run(
+        `
+        INSERT INTO haccp_alerts (
+          organization_id,
+          process_id,
+          entry_id,
+          severity,
+          message,
+          alert_type
+        )
+        VALUES (?, ?, ?, ?, ?, 'ENTRY_DEVIATION')
+        `,
+        [
+          organizationId,
+          Number(entry.process_id),
+          entry.id,
+          getSeverityForStatus(entryValidation.status),
+          alertMessage || "Wpis oznaczony jako niezgodny.",
+        ]
+      );
+      alertId = createdAlert.lastID;
+    }
+
+    await createAuditLog({
+      organizationId,
+      entityType: "ProcessEntry",
+      entityId: entry.id,
+      action: "UPDATE",
+      oldValue: {
+        status: entry.status,
+        recorded_for_at: entry.recorded_for_at,
+        is_reviewed: Number(entry.is_reviewed) === 1,
+        reviewed_by: entry.reviewed_by,
+        reviewed_at: entry.reviewed_at,
+        values: oldValues,
+      },
+      newValue: {
+        status: entryValidation.status,
+        recorded_for_at: recordedForAt || entry.recorded_for_at,
+        is_reviewed: false,
+        reviewed_by: null,
+        reviewed_at: null,
+        values: entryValidation.values,
+      },
+      createdBy: userId,
+    });
+
+    if (correctiveActionId) {
+      await createAuditLog({
+        organizationId,
+        entityType: "CorrectiveAction",
+        entityId: correctiveActionId,
+        action: "CREATE",
+        oldValue: null,
+        newValue: { description: correctiveAction },
+        createdBy: userId,
+      });
+    }
+
+    if (alertId) {
+      await createAuditLog({
+        organizationId,
+        entityType: "Alert",
+        entityId: alertId,
+        action: "CREATE",
+        oldValue: null,
+        newValue: {
+          severity: getSeverityForStatus(entryValidation.status),
+          status: entryValidation.status,
+        },
+        createdBy: userId,
+      });
+    }
+
+    await db.run("COMMIT");
+
+    if (entryValidation.status !== "OK") {
+      await notifyManagers(
+        organizationId,
+        `HACCP: edytowano wpis (${entryValidation.status})`,
+        `Wpis procesu "${processDefinition.name}" po edycji ma status ${entryValidation.status}.`,
+        "/manager/haccp/alerts"
+      );
+    }
+
+    return {
+      ok: true,
+      entryId: entry.id,
+      status: entryValidation.status,
+      process: processDefinition,
+      recordedForAt: recordedForAt || entry.recorded_for_at,
+    };
+  } catch (error) {
+    await db.run("ROLLBACK");
+    throw error;
+  }
+}
+
 function parseEntryFilters(query) {
   const dateFrom = normalizeDate(query.dateFrom);
   const dateTo = normalizeDate(query.dateTo);
@@ -1341,6 +1604,7 @@ module.exports = {
   createProcess,
   updateProcess,
   createEntry,
+  updateEntryByManager,
   listEntriesForManager,
   listEntriesForEmployee,
   getEntryWithDetails,

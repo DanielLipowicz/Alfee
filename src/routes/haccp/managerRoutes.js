@@ -16,6 +16,7 @@ const {
   listProcesses,
   getProcessWithFields,
   createEntry,
+  updateEntryByManager,
   createProcess,
   updateProcess,
   ensureMissingEntryAlerts,
@@ -96,6 +97,15 @@ function extractDateFromDedupeKey(dedupeKey) {
   const raw = String(dedupeKey || "");
   const match = raw.match(/^missing:\d+:(\d{4}-\d{2}-\d{2})$/);
   return match ? match[1] : null;
+}
+
+function toDateTimeLocalValue(sqlDateTime) {
+  const normalized = String(sqlDateTime || "").trim();
+  const match = normalized.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
+  if (!match) {
+    return "";
+  }
+  return `${match[1]}T${match[2]}:${match[3]}`;
 }
 
 router.use(ensureAuthenticated, ensureManager, ensureManagerOrganization);
@@ -372,6 +382,108 @@ router.get("/entries/:entryId", async (req, res, next) => {
       title: "HACCP - szczegoly wpisu",
       details,
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/entries/:entryId/edit", async (req, res, next) => {
+  try {
+    const details = await getEntryWithDetails(
+      Number(req.params.entryId),
+      req.activeOrganizationId
+    );
+    if (!details) {
+      return res.status(404).render("error", {
+        title: "Brak wpisu",
+        message: "Nie znaleziono wskazanego wpisu HACCP.",
+      });
+    }
+
+    const process = await getProcessWithFields(
+      Number(details.entry.process_id),
+      req.activeOrganizationId,
+      false
+    );
+    if (!process) {
+      return res.status(404).render("error", {
+        title: "Brak procesu",
+        message: "Proces powiazany z tym wpisem nie jest dostepny.",
+      });
+    }
+
+    const previousValues = {};
+    for (let index = 0; index < details.values.length; index += 1) {
+      const value = details.values[index];
+      previousValues[`field_${value.field_id}`] =
+        value.value == null ? "" : String(value.value);
+    }
+
+    return res.render("manager/haccp-entry-edit", {
+      title: `HACCP - edycja wpisu #${details.entry.id}`,
+      details,
+      process,
+      errors: [],
+      previousValues,
+      correctiveAction: "",
+      recordedForAt: toDateTimeLocalValue(
+        details.entry.recorded_for_at || details.entry.created_at
+      ),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put("/entries/:entryId", async (req, res, next) => {
+  try {
+    const result = await updateEntryByManager({
+      organizationId: req.activeOrganizationId,
+      entryId: Number(req.params.entryId),
+      userId: req.user.id,
+      body: req.body,
+    });
+
+    if (!result.ok) {
+      if (result.notFound) {
+        return res.status(404).render("error", {
+          title: "Brak wpisu",
+          message: "Nie znaleziono wskazanego wpisu HACCP.",
+        });
+      }
+
+      const details = await getEntryWithDetails(
+        Number(req.params.entryId),
+        req.activeOrganizationId
+      );
+      const process = details
+        ? await getProcessWithFields(
+            Number(details.entry.process_id),
+            req.activeOrganizationId,
+            false
+          )
+        : null;
+
+      if (!details || !process) {
+        return res.status(404).render("error", {
+          title: "Brak wpisu",
+          message: "Nie znaleziono wskazanego wpisu HACCP.",
+        });
+      }
+
+      return res.status(400).render("manager/haccp-entry-edit", {
+        title: `HACCP - edycja wpisu #${details.entry.id}`,
+        details,
+        process,
+        errors: result.errors || ["Nie udalo sie zaktualizowac wpisu."],
+        previousValues: req.body,
+        correctiveAction: String(req.body.correctiveAction || ""),
+        recordedForAt: String(req.body.recordedForAt || ""),
+      });
+    }
+
+    setFlash(req, "success", "Zaktualizowano wpis HACCP.");
+    return res.redirect(`/manager/haccp/entries/${result.entryId}`);
   } catch (error) {
     return next(error);
   }

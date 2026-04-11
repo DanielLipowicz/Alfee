@@ -1,0 +1,175 @@
+<%- include("../partials/top", { title }) %>
+
+<section class="card narrow">
+  <div class="section-head">
+    <h1>Edycja wpisu HACCP #<%= details.entry.id %></h1>
+    <div class="actions">
+      <a class="btn" href="/manager/haccp/entries/<%= details.entry.id %>">Powrot do szczegolow</a>
+    </div>
+  </div>
+
+  <p class="muted">
+    Proces: <strong><%= process.name %></strong>
+    <% if (Number(process.is_ccp) === 1) { %>
+    <span class="badge badge--critical">CCP</span>
+    <% } %>
+  </p>
+
+  <% if (errors && errors.length > 0) { %>
+  <div class="flash flash--error">
+    <% errors.forEach((error) => { %>
+    <div><%= error %></div>
+    <% }) %>
+  </div>
+  <% } %>
+
+  <form method="POST" action="/manager/haccp/entries/<%= details.entry.id %>?_method=PUT" class="form-stack">
+    <label>
+      Dotyczy czasu
+      <input
+        type="datetime-local"
+        name="recordedForAt"
+        data-round-minute="1"
+        step="60"
+        value="<%= recordedForAt || '' %>"
+      />
+      <span class="muted">Czas jest zaokraglany do pelnej minuty.</span>
+    </label>
+
+    <% process.fields.forEach((field) => { %>
+    <% const inputName = `field_${field.id}`; %>
+    <% const previousValue = previousValues[inputName] == null ? "" : previousValues[inputName]; %>
+    <% const isTimeField = /czas|godzin|godz|time|hour|minut/i.test(String(field.name || "")); %>
+
+    <label>
+      <%= field.name %>
+      <% if (Number(field.required) === 1) { %>
+      <span class="muted">(wymagane)</span>
+      <% } %>
+
+      <% if (field.type === "TEXT") { %>
+      <input
+        type="text"
+        name="<%= inputName %>"
+        value="<%= previousValue %>"
+        placeholder="<%= isTimeField ? 'HH:MM lub YYYY-MM-DD HH:MM' : '' %>"
+        <%= Number(field.required) === 1 ? "required" : "" %>
+      />
+      <% if (isTimeField) { %>
+      <span class="muted">Pole czasowe: czas zostanie zaokraglony do pelnej minuty.</span>
+      <% } %>
+      <% } else if (field.type === "NUMBER") { %>
+      <input
+        type="text"
+        name="<%= inputName %>"
+        value="<%= previousValue %>"
+        <%= Number(field.required) === 1 ? "required" : "" %>
+      />
+      <span class="muted">
+        Zakres:
+        <%= field.min_value == null ? "-inf" : field.min_value %>
+        do
+        <%= field.max_value == null ? "+inf" : field.max_value %>
+      </span>
+      <% } else if (field.type === "BOOLEAN") { %>
+      <select name="<%= inputName %>" <%= Number(field.required) === 1 ? "required" : "" %>>
+        <option value="" <%= previousValue === "" ? "selected" : "" %>>Wybierz</option>
+        <option value="1" <%= String(previousValue) === "1" ? "selected" : "" %>>TAK</option>
+        <option value="0" <%= String(previousValue) === "0" ? "selected" : "" %>>NIE</option>
+      </select>
+      <% } else if (field.type === "SELECT") { %>
+      <select name="<%= inputName %>" <%= Number(field.required) === 1 ? "required" : "" %>>
+        <option value="">Wybierz</option>
+        <% field.allowed_values.forEach((option) => { %>
+        <option value="<%= option %>" <%= String(previousValue) === String(option) ? "selected" : "" %>>
+          <%= option %>
+        </option>
+        <% }) %>
+      </select>
+      <% } %>
+    </label>
+    <% }) %>
+
+    <label>
+      Nowe dzialanie korygujace (opcjonalnie)
+      <textarea name="correctiveAction" rows="4"><%= correctiveAction || "" %></textarea>
+    </label>
+
+    <% if (details.correctiveActions && details.correctiveActions.length > 0) { %>
+    <div class="tenant-card">
+      <h2>Dotychczasowe dzialania korygujace</h2>
+      <ul class="haccp-list">
+        <% details.correctiveActions.forEach((action) => { %>
+        <li><strong><%= action.created_at %>:</strong> <%= action.description %></li>
+        <% }) %>
+      </ul>
+    </div>
+    <% } %>
+
+    <div class="actions">
+      <button class="btn btn--primary" type="submit">Zapisz zmiany wpisu</button>
+      <a class="btn" href="/manager/haccp/entries/<%= details.entry.id %>">Anuluj</a>
+    </div>
+  </form>
+</section>
+
+<script>
+  (function setupMinuteRounding() {
+    const inputs = document.querySelectorAll("[data-round-minute='1']");
+    const forms = document.querySelectorAll("form");
+
+    function formatTwoDigits(value) {
+      return String(value).padStart(2, "0");
+    }
+
+    function toMinuteRounded(value) {
+      const match = String(value || "").match(
+        /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/
+      );
+      if (!match) {
+        return String(value || "");
+      }
+
+      const year = Number.parseInt(match[1], 10);
+      const month = Number.parseInt(match[2], 10);
+      const day = Number.parseInt(match[3], 10);
+      const hour = Number.parseInt(match[4], 10);
+      const minute = Number.parseInt(match[5], 10);
+      const second = Number.parseInt(match[6] || "0", 10);
+
+      const date = new Date(year, month - 1, day, hour, minute, 0, 0);
+      if (second >= 30) {
+        date.setMinutes(date.getMinutes() + 1);
+      }
+
+      return `${date.getFullYear()}-${formatTwoDigits(
+        date.getMonth() + 1
+      )}-${formatTwoDigits(date.getDate())}T${formatTwoDigits(
+        date.getHours()
+      )}:${formatTwoDigits(date.getMinutes())}`;
+    }
+
+    inputs.forEach((input) => {
+      const applyRounding = () => {
+        if (!input.value) {
+          return;
+        }
+        input.value = toMinuteRounded(input.value);
+      };
+      input.addEventListener("change", applyRounding);
+      input.addEventListener("blur", applyRounding);
+    });
+
+    forms.forEach((form) => {
+      form.addEventListener("submit", () => {
+        inputs.forEach((input) => {
+          if (input.value) {
+            input.value = toMinuteRounded(input.value);
+          }
+        });
+      });
+    });
+  })();
+</script>
+
+<%- include("../partials/bottom") %>
