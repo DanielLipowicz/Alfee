@@ -5,6 +5,8 @@ const { db } = require("../../database");
 const { parseBoolean, normalizeText, escapeCsv } = require("./shared");
 const { listEntriesForManager } = require("./process");
 
+let cachedPdfFontPath = null;
+
 function getPdfDocumentConstructor() {
   try {
     return require("pdfkit");
@@ -190,7 +192,28 @@ function buildCsvReport(reportGroups = []) {
   return lines.join("\n");
 }
 
+function findFontInDirectories(directories, fileNames) {
+  for (let dirIndex = 0; dirIndex < directories.length; dirIndex += 1) {
+    const directory = directories[dirIndex];
+    if (!directory || !fs.existsSync(directory)) {
+      continue;
+    }
+
+    for (let fileIndex = 0; fileIndex < fileNames.length; fileIndex += 1) {
+      const candidate = path.join(directory, fileNames[fileIndex]);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
 function resolvePdfFontPath() {
+  if (cachedPdfFontPath) {
+    return cachedPdfFontPath;
+  }
+
   const configuredPath = normalizeText(process.env.HACCP_PDF_FONT_PATH);
   const candidates = [
     configuredPath,
@@ -199,7 +222,10 @@ function resolvePdfFontPath() {
     "C:\\Windows\\Fonts\\arial.ttf",
     "C:\\Windows\\Fonts\\segoeui.ttf",
     "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    "/usr/share/fonts/noto/NotoSans-Regular.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/TTF/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
   ];
 
@@ -209,8 +235,31 @@ function resolvePdfFontPath() {
       continue;
     }
     if (fs.existsSync(candidate)) {
+      cachedPdfFontPath = candidate;
       return candidate;
     }
+  }
+
+  const discovered = findFontInDirectories(
+    [
+      "/usr/share/fonts",
+      "/usr/local/share/fonts",
+      "/usr/share/fonts/truetype",
+      "/usr/share/fonts/dejavu",
+      "/usr/share/fonts/noto",
+      "/usr/share/fonts/TTF",
+    ],
+    [
+      "NotoSans-Regular.ttf",
+      "DejaVuSans.ttf",
+      "LiberationSans-Regular.ttf",
+      "Arial.ttf",
+      "arial.ttf",
+    ]
+  );
+  if (discovered) {
+    cachedPdfFontPath = discovered;
+    return discovered;
   }
 
   return null;
@@ -278,6 +327,7 @@ async function buildPdfReport(reportGroups = [], filters = {}) {
 
     const regularFontPath = resolvePdfFontPath();
     if (regularFontPath) {
+      console.info(`HACCP PDF: uzywany font: ${regularFontPath}`);
       doc.font(regularFontPath);
     } else {
       console.warn(
