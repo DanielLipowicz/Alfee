@@ -1,4 +1,12 @@
-const { FIELD_TYPES, FREQUENCY_TYPES, ENTRY_STATUSES } = require("./shared");
+const {
+  FIELD_TYPES,
+  FREQUENCY_TYPES,
+  ENTRY_STATUSES,
+  normalizeFrequencyType,
+  buildFrequencyOptions,
+  getFrequencyLabel,
+  getExpectedEntriesPerDay,
+} = require("./shared");
 const {
   parseProcessPayload,
   parseEntryFilters,
@@ -26,6 +34,10 @@ module.exports = {
   FIELD_TYPES,
   FREQUENCY_TYPES,
   ENTRY_STATUSES,
+  normalizeFrequencyType,
+  buildFrequencyOptions,
+  getFrequencyLabel,
+  getExpectedEntriesPerDay,
   parseProcessPayload,
   parseEntryFilters,
   parseAlertFilters,

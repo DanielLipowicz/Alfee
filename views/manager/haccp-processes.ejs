@@ -40,16 +40,16 @@
         </td>
         <td><%= Number(process.is_active) === 1 ? "TAK" : "NIE" %></td>
         <td>
-          <%= process.frequency_type %>
-          <% if (process.frequency_value != null) { %>
-            (<%= process.frequency_value %>)
-          <% } %>
+          <%= process.frequency_label || process.frequency_type %>
         </td>
         <td><%= process.field_count %></td>
         <td><%= process.entry_count %></td>
         <td>
           <div class="actions">
             <a class="btn" href="/manager/haccp/processes/<%= process.id %>/edit">Edytuj</a>
+            <% if (Number(process.is_active) === 1) { %>
+            <a class="btn btn--primary" href="/manager/haccp/processes/<%= process.id %>/new-entry">Dodaj wpis</a>
+            <% } %>
           </div>
         </td>
       </tr>

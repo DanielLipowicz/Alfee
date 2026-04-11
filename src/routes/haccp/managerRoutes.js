@@ -6,7 +6,10 @@ const { ensureManagerOrganization } = require("../../middleware/tenant");
 const { setFlash } = require("../../utils/flash");
 const {
   FIELD_TYPES,
-  FREQUENCY_TYPES,
+  buildFrequencyOptions,
+  getFrequencyLabel,
+  getExpectedEntriesPerDay,
+  normalizeFrequencyType,
   ENTRY_STATUSES,
   parseEntryFilters,
   parseAlertFilters,
@@ -33,7 +36,7 @@ function blankProcessFormData() {
   return {
     name: "",
     description: "",
-    frequencyType: "NONE",
+    frequencyType: "ON_DEMAND",
     frequencyValue: "",
     isActive: true,
     isCcp: false,
@@ -58,7 +61,7 @@ function mapProcessToFormData(process) {
   return {
     name: process.name || "",
     description: process.description || "",
-    frequencyType: process.frequency_type || "NONE",
+    frequencyType: normalizeFrequencyType(process.frequency_type),
     frequencyValue:
       process.frequency_value == null ? "" : String(process.frequency_value),
     isActive: Number(process.is_active) === 1,
@@ -78,22 +81,21 @@ function mapProcessToFormData(process) {
   };
 }
 
+function mapProcessFrequencyLabel(process, locale = "pl") {
+  return {
+    ...process,
+    frequency_label: getFrequencyLabel(
+      process.frequency_type,
+      process.frequency_value,
+      locale
+    ),
+  };
+}
+
 function extractDateFromDedupeKey(dedupeKey) {
   const raw = String(dedupeKey || "");
   const match = raw.match(/^missing:\d+:(\d{4}-\d{2}-\d{2})$/);
   return match ? match[1] : null;
-}
-
-function toDateTimeLocalValue(sqlTimestamp) {
-  const raw = String(sqlTimestamp || "").trim();
-  if (!raw) {
-    return "";
-  }
-  const match = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
-  if (!match) {
-    return "";
-  }
-  return `${match[1]}T${match[2]}:${match[3]}`;
 }
 
 router.use(ensureAuthenticated, ensureManager, ensureManagerOrganization);
@@ -109,17 +111,22 @@ router.use(async (req, _res, next) => {
 
 router.get("/", async (req, res, next) => {
   try {
-    const [stats, latestAlerts, latestEntries] = await Promise.all([
+    const [stats, latestAlerts, latestEntries, processesRaw] = await Promise.all([
       getManagerDashboardStats(req.activeOrganizationId),
       listAlertsForManager(req.activeOrganizationId, { resolved: 0 }),
       listEntriesForManager(req.activeOrganizationId, {}),
+      listProcesses(req.activeOrganizationId, true),
     ]);
+    const processes = processesRaw.map((process) =>
+      mapProcessFrequencyLabel(process, req.locale)
+    );
 
     return res.render("manager/haccp-dashboard", {
       title: "HACCP",
       stats,
       latestAlerts: latestAlerts.slice(0, 8),
       latestEntries: latestEntries.slice(0, 8),
+      processes,
     });
   } catch (error) {
     return next(error);
@@ -128,7 +135,10 @@ router.get("/", async (req, res, next) => {
 
 router.get("/processes", async (req, res, next) => {
   try {
-    const processes = await listProcesses(req.activeOrganizationId, true);
+    const processesRaw = await listProcesses(req.activeOrganizationId, true);
+    const processes = processesRaw.map((process) =>
+      mapProcessFrequencyLabel(process, req.locale)
+    );
     return res.render("manager/haccp-processes", {
       title: "HACCP - procesy",
       processes,
@@ -145,7 +155,7 @@ router.get("/processes/new", (_req, res) => {
     processId: null,
     formData: blankProcessFormData(),
     fieldTypes: FIELD_TYPES,
-    frequencyTypes: FREQUENCY_TYPES,
+    frequencyOptions: buildFrequencyOptions(_req.locale),
     errors: [],
   });
 });
@@ -165,7 +175,7 @@ router.post("/processes", async (req, res, next) => {
         processId: null,
         formData: result.data || blankProcessFormData(),
         fieldTypes: FIELD_TYPES,
-        frequencyTypes: FREQUENCY_TYPES,
+        frequencyOptions: buildFrequencyOptions(req.locale),
         errors: result.errors || ["Nie udalo sie zapisac procesu."],
       });
     }
@@ -196,7 +206,7 @@ router.get("/processes/:processId/edit", async (req, res, next) => {
       processId: process.id,
       formData: mapProcessToFormData(process),
       fieldTypes: FIELD_TYPES,
-      frequencyTypes: FREQUENCY_TYPES,
+      frequencyOptions: buildFrequencyOptions(req.locale),
       errors: [],
     });
   } catch (error) {
@@ -228,13 +238,87 @@ router.put("/processes/:processId", async (req, res, next) => {
         processId,
         formData: result.data || blankProcessFormData(),
         fieldTypes: FIELD_TYPES,
-        frequencyTypes: FREQUENCY_TYPES,
+        frequencyOptions: buildFrequencyOptions(req.locale),
         errors: result.errors || ["Nie udalo sie zapisac zmian."],
       });
     }
 
-    setFlash(req, "success", "Zaktualizowano proces HACCP.");
+    if (result.modelArchived) {
+      setFlash(
+        req,
+        "success",
+        `Model procesu zostal zmieniony. Stara wersja zostala zarchiwizowana jako "${result.archivedProcessName}".`
+      );
+    } else {
+      setFlash(req, "success", "Zaktualizowano proces HACCP.");
+    }
     return res.redirect("/manager/haccp/processes");
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/processes/:processId/new-entry", async (req, res, next) => {
+  try {
+    const process = await getProcessWithFields(
+      Number(req.params.processId),
+      req.activeOrganizationId,
+      true
+    );
+    if (!process) {
+      return res.status(404).render("error", {
+        title: "Brak procesu",
+        message: "Nie znaleziono aktywnego procesu HACCP dla tej organizacji.",
+      });
+    }
+
+    return res.render("manager/haccp-entry-form", {
+      title: `HACCP - wpis kierownika (${process.name})`,
+      process,
+      errors: [],
+      previousValues: {},
+      correctiveAction: "",
+      recordedForAt: "",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/processes/:processId/entries", async (req, res, next) => {
+  try {
+    const process = await getProcessWithFields(
+      Number(req.params.processId),
+      req.activeOrganizationId,
+      true
+    );
+    if (!process) {
+      return res.status(404).render("error", {
+        title: "Brak procesu",
+        message: "Nie znaleziono aktywnego procesu HACCP dla tej organizacji.",
+      });
+    }
+
+    const result = await createEntry({
+      organizationId: req.activeOrganizationId,
+      processId: process.id,
+      userId: req.user.id,
+      body: req.body,
+    });
+
+    if (!result.ok) {
+      return res.status(400).render("manager/haccp-entry-form", {
+        title: `HACCP - wpis kierownika (${process.name})`,
+        process: result.process || process,
+        errors: result.errors || ["Nie udalo sie zapisac wpisu."],
+        previousValues: req.body,
+        correctiveAction: String(req.body.correctiveAction || ""),
+        recordedForAt: String(req.body.recordedForAt || ""),
+      });
+    }
+
+    setFlash(req, "success", `Dodano wpis procesu (status: ${result.status}).`);
+    return res.redirect("/manager/haccp/reports");
   } catch (error) {
     return next(error);
   }
@@ -425,10 +509,18 @@ router.post("/alerts/:alertId/fill-missing", async (req, res, next) => {
     let missingResolved = false;
 
     if (alertDate) {
-      const requiredCount =
-        String(alert.frequency_type || "") === "MULTIPLE_PER_DAY"
-          ? Math.max(Number(alert.frequency_value) || 1, 1)
-          : Math.max(Number(alert.frequency_value) || 1, 1);
+      const requiredCount = getExpectedEntriesPerDay(
+        alert.frequency_type,
+        alert.frequency_value
+      );
+      if (requiredCount == null) {
+        setFlash(
+          req,
+          "success",
+          `Uzupelniono wpis (dotyczy: ${result.recordedForAt || "teraz"}).`
+        );
+        return res.redirect("/manager/haccp/alerts");
+      }
 
       const countRow = await db.get(
         `

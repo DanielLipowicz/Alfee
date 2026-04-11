@@ -16,6 +16,14 @@ async function rollbackSafely() {
   }
 }
 
+function buildDeletedEmail(userId) {
+  return `deleted-user-${userId}-${Date.now()}@alfee.invalid`;
+}
+
+function buildDeletedName(userId) {
+  return `Usuniete konto #${userId}`;
+}
+
 router.get("/organizations", async (_req, res, next) => {
   try {
     const [organizations, users, allUsers, members] = await Promise.all([
@@ -38,7 +46,7 @@ router.get("/organizations", async (_req, res, next) => {
         `
         SELECT id, name, email, role
         FROM users
-        WHERE role IN ('manager', 'employee', 'observer')
+        WHERE role IN ('manager', 'employee', 'observer') AND deleted_at IS NULL
         ORDER BY role ASC, name ASC
         `
       ),
@@ -46,6 +54,7 @@ router.get("/organizations", async (_req, res, next) => {
         `
         SELECT id, name, email, role
         FROM users
+        WHERE deleted_at IS NULL
         ORDER BY
           CASE role
             WHEN 'admin' THEN 1
@@ -66,7 +75,7 @@ router.get("/organizations", async (_req, res, next) => {
           u.role AS user_role
         FROM user_organizations uo
         JOIN organizations o ON o.id = uo.organization_id
-        JOIN users u ON u.id = uo.user_id
+        JOIN users u ON u.id = uo.user_id AND u.deleted_at IS NULL
         ORDER BY o.name ASC, u.role ASC, u.name ASC
         `
       ),
@@ -214,9 +223,10 @@ router.put("/users/:userId/role", async (req, res, next) => {
   }
 
   try {
-    const user = await db.get("SELECT id, name, role FROM users WHERE id = ?", [
-      userId,
-    ]);
+    const user = await db.get(
+      "SELECT id, name, role FROM users WHERE id = ? AND deleted_at IS NULL",
+      [userId]
+    );
     if (!user) {
       setFlash(req, "error", "Nie znaleziono uzytkownika.");
       return res.redirect("/admin/organizations");
@@ -233,7 +243,7 @@ router.put("/users/:userId/role", async (req, res, next) => {
 
     if (user.role === "admin" && targetRole !== "admin") {
       const adminCount = await db.get(
-        "SELECT COUNT(*) AS total FROM users WHERE role = 'admin'"
+        "SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND deleted_at IS NULL"
       );
       if (Number(adminCount.total || 0) <= 1) {
         setFlash(req, "error", "Nie mozna zdegradowac ostatniego administratora.");
@@ -245,6 +255,72 @@ router.put("/users/:userId/role", async (req, res, next) => {
     setFlash(req, "success", `Zmieniono role dla ${user.name}.`);
     return res.redirect("/admin/organizations");
   } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/users/:userId", async (req, res, next) => {
+  const userId = Number(req.params.userId);
+  if (!userId) {
+    setFlash(req, "error", "Niepoprawne ID uzytkownika.");
+    return res.redirect("/admin/organizations");
+  }
+
+  try {
+    const user = await db.get(
+      "SELECT id, name, role, deleted_at FROM users WHERE id = ?",
+      [userId]
+    );
+    if (!user || user.deleted_at) {
+      setFlash(req, "error", "Nie znaleziono aktywnego uzytkownika.");
+      return res.redirect("/admin/organizations");
+    }
+
+    if (Number(req.user.id) === Number(user.id)) {
+      setFlash(req, "error", "Nie mozesz usunac swojego konta z tego panelu.");
+      return res.redirect("/admin/organizations");
+    }
+
+    if (user.role === "admin") {
+      const adminCount = await db.get(
+        "SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND deleted_at IS NULL"
+      );
+      if (Number(adminCount.total || 0) <= 1) {
+        setFlash(req, "error", "Nie mozna usunac ostatniego administratora.");
+        return res.redirect("/admin/organizations");
+      }
+    }
+
+    await db.run("BEGIN TRANSACTION");
+    await db.run("DELETE FROM user_organizations WHERE user_id = ?", [user.id]);
+    await db.run(
+      `
+      UPDATE users
+      SET
+        google_id = NULL,
+        email = ?,
+        name = ?,
+        auth_provider = 'deleted',
+        password_hash = NULL,
+        failed_login_attempts = 0,
+        locked_until = NULL,
+        is_active = 0,
+        role = 'employee',
+        deleted_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [buildDeletedEmail(user.id), buildDeletedName(user.id), user.id]
+    );
+    await db.run("COMMIT");
+
+    setFlash(
+      req,
+      "success",
+      `Usunieto konto ${user.name}. Historia akcji pozostala powiazana z ID uzytkownika.`
+    );
+    return res.redirect("/admin/organizations");
+  } catch (error) {
+    await rollbackSafely();
     return next(error);
   }
 });
@@ -282,7 +358,7 @@ router.post("/memberships", async (req, res, next) => {
     const [organization, user] = await Promise.all([
       db.get("SELECT id FROM organizations WHERE id = ?", [organizationId]),
       db.get(
-        "SELECT id, role FROM users WHERE id = ? AND role IN ('manager', 'employee', 'observer')",
+        "SELECT id, role FROM users WHERE id = ? AND role IN ('manager', 'employee', 'observer') AND deleted_at IS NULL",
         [userId]
       ),
     ]);

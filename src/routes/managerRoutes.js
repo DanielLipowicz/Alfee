@@ -485,7 +485,7 @@ router.get("/dashboard", async (req, res, next) => {
     );
 
     return res.render("manager/dashboard", {
-      title: "Panel kierownika",
+      title: "Manager dashboard",
       stats: {
         tasks: stats[0].count,
         employees: stats[1].count,

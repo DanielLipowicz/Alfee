@@ -1,7 +1,7 @@
 const { db } = require("../../database");
 const {
-  parseInteger,
   normalizeDate,
+  getExpectedEntriesPerDay,
   createAuditLog,
   notifyManagers,
 } = require("./shared");
@@ -25,7 +25,6 @@ async function ensureMissingEntryAlerts(organizationId, createdBy = null) {
     WHERE
       organization_id = ?
       AND is_active = 1
-      AND frequency_type IN ('DAILY', 'MULTIPLE_PER_DAY')
       AND date(created_at) <= ?
     ORDER BY id ASC
     `,
@@ -34,10 +33,14 @@ async function ensureMissingEntryAlerts(organizationId, createdBy = null) {
 
   for (let index = 0; index < processes.length; index += 1) {
     const process = processes[index];
-    const requiredCount =
-      process.frequency_type === "MULTIPLE_PER_DAY"
-        ? Math.max(parseInteger(process.frequency_value) || 1, 1)
-        : Math.max(parseInteger(process.frequency_value) || 1, 1);
+    const requiredCount = getExpectedEntriesPerDay(
+      process.frequency_type,
+      process.frequency_value
+    );
+
+    if (requiredCount == null) {
+      continue;
+    }
 
     const entryCountRow = await db.get(
       `

@@ -1,0 +1,151 @@
+<%- include("partials/top", { title }) %>
+
+<section class="hero product-hero">
+  <h1>Alfee - platforma do codziennej kontroli pracy i jakosci</h1>
+  <p>
+    Alfee pomaga uporzadkowac obowiazki zespolu, przyspiesza obieg informacji i
+    zapewnia czytelny nadzor nad wykonaniem zadan oraz procesami HACCP.
+    Projekt jest gotowy do pracy w wielu organizacjach i wspiera rozne role
+    uzytkownikow.
+  </p>
+  <div class="hero__actions">
+    <a class="btn btn--primary" href="/register">Zaloz konto</a>
+    <a class="btn" href="/login">Zaloguj sie</a>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Co otrzymuje Twoja firma</h2>
+  <div class="product-grid">
+    <article class="product-feature">
+      <h3>Pelna widocznosc pracy</h3>
+      <p>
+        Kierownik i obserwator widza postep na poziomie konkretnego wykonania,
+        krok po kroku, razem z dowodami i komentarzami.
+      </p>
+    </article>
+    <article class="product-feature">
+      <h3>Jeden system dla wielu organizacji</h3>
+      <p>
+        Ten sam uzytkownik moze dzialac w kilku organizacjach, a dane sa
+        izolowane tenantowo i uporzadkowane wedlug aktywnej organizacji.
+      </p>
+    </article>
+    <article class="product-feature">
+      <h3>Kontrola HACCP i raportowanie</h3>
+      <p>
+        Procesy, wpisy, alerty, review i eksporty raportow (CSV/PDF) sa dostepne
+        w jednym miejscu, z historia zmian i statusem.
+      </p>
+    </article>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Pelny zakres funkcjonalnosci</h2>
+
+  <article class="tenant-card">
+    <h3>1. Role i dostepy</h3>
+    <ul class="product-list">
+      <li><strong>Administrator:</strong> organizacje, role, czlonkostwa, tryb kierownika.</li>
+      <li><strong>Kierownik:</strong> zadania, przydzialy, pracownicy, obserwatorzy, HACCP.</li>
+      <li><strong>Pracownik:</strong> realizacja przydzialow, dowody, wpisy HACCP.</li>
+      <li><strong>Obserwator:</strong> podglad postepu i komentarze do realizacji.</li>
+    </ul>
+  </article>
+
+  <article class="tenant-card">
+    <h3>2. Organizacje i praca wielo-tenantowa</h3>
+    <ul class="product-list">
+      <li>Tworzenie, edycja i usuwanie organizacji przez administratora.</li>
+      <li>Przypisywanie uzytkownikow do wielu organizacji (membership).</li>
+      <li>Przelaczanie aktywnej organizacji przez kierownika z poziomu naglowka.</li>
+      <li>Widocznosc danych ograniczona do uprawnionych organizacji.</li>
+    </ul>
+  </article>
+
+  <article class="tenant-card">
+    <h3>3. Zarzadzanie kontami</h3>
+    <ul class="product-list">
+      <li>Rejestracja lokalna i logowanie lokalne (email + haslo).</li>
+      <li>Opcjonalne logowanie Google OAuth 2.0.</li>
+      <li>Tworzenie kont pracownikow przez kierownika (od razu z przypisaniem).</li>
+      <li>Tworzenie kont obserwatorow z haslem startowym pokazanym jednorazowo.</li>
+      <li>Edycja profilu i samodzielna zmiana hasla przez uzytkownika.</li>
+    </ul>
+  </article>
+
+  <article class="tenant-card">
+    <h3>4. Modul zadan operacyjnych</h3>
+    <ul class="product-list">
+      <li>Tworzenie szablonow zadan z lista krokow (czynnosci).</li>
+      <li>Edycja, kopiowanie i usuwanie szablonow.</li>
+      <li>Powiazanie zadania z obserwatorem (opcjonalnie).</li>
+      <li>Przydzielanie zadan pracownikom z tej samej organizacji.</li>
+      <li>Dashboard kierownika z metrykami i najnowszymi wykonaniami.</li>
+    </ul>
+  </article>
+
+  <article class="tenant-card">
+    <h3>5. Realizacja zadan przez pracownika</h3>
+    <ul class="product-list">
+      <li>Lista przydzialow z postepem, statusem i organizacja.</li>
+      <li>Oznaczanie krokow jako wykonane / niewykonane.</li>
+      <li>Automatyczne przeliczanie postepu i statusu wykonania.</li>
+      <li>Powiadomienie kierownika po zakonczeniu calego zadania.</li>
+    </ul>
+  </article>
+
+  <article class="tenant-card">
+    <h3>6. Dowody wykonania i komunikacja</h3>
+    <ul class="product-list">
+      <li>Dodawanie wielu zdjec jako dowod do konkretnego kroku.</li>
+      <li>Usuwanie blednych dowodow i podglad historii zalacznikow.</li>
+      <li>Komentarze do wykonania dostepne dla uczestnikow procesu.</li>
+      <li>Jedna nitka komentarzy dla kierownika, pracownika i obserwatora.</li>
+    </ul>
+  </article>
+
+  <article class="tenant-card">
+    <h3>7. Modul HACCP</h3>
+    <ul class="product-list">
+      <li>Definiowanie procesow HACCP, pol kontrolnych i czestotliwosci.</li>
+      <li>Dodawanie wpisow HACCP przez pracownikow.</li>
+      <li>Statusy wpisow (np. OK/ALERT/CRITICAL) i oznaczenie CCP.</li>
+      <li>Wykrywanie alertow, uzupelnianie brakow i zamykanie alertow.</li>
+      <li>Review wpisow przez kierownika i zapis dzialan korygujacych.</li>
+      <li>Raporty filtrowane po dacie, statusie, procesie i pracowniku.</li>
+      <li>Eksport raportow HACCP do CSV i PDF.</li>
+    </ul>
+  </article>
+
+  <article class="tenant-card">
+    <h3>8. Powiadomienia i nadzor</h3>
+    <ul class="product-list">
+      <li>Licznik nieprzeczytanych powiadomien w naglowku.</li>
+      <li>Lista powiadomien z przejsciem bezposrednio do sprawy.</li>
+      <li>Oznaczanie pojedynczo i zbiorczo jako przeczytane.</li>
+    </ul>
+  </article>
+
+  <article class="tenant-card">
+    <h3>9. Bezpieczenstwo</h3>
+    <ul class="product-list">
+      <li>Silna polityka hasel (dlugosc + mala/wielka litera + cyfra + znak specjalny).</li>
+      <li>Haszowanie hasel algorytmem scrypt.</li>
+      <li>Blokada konta po wielu nieudanych probach logowania.</li>
+      <li>Sesje z bezpiecznymi cookie i wsparciem pracy za reverse proxy HTTPS.</li>
+    </ul>
+  </article>
+</section>
+
+<section class="card">
+  <h2>Podsumowanie dla klienta</h2>
+  <p>
+    Alfee laczy codzienne zarzadzanie zadaniami z kontrola jakosci HACCP.
+    Dzieki temu firma zyskuje jedno narzedzie do planowania pracy, monitorowania
+    realizacji i dokumentowania zgodnosci operacyjnej.
+  </p>
+</section>
+
+<%- include("partials/bottom") %>

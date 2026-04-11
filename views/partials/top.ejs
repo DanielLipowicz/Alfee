@@ -1,9 +1,9 @@
 ﻿<!doctype html>
-<html lang="pl">
+<html lang="<%= locale || 'pl' %>">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title><%= title ? `${title} | Alfee` : "Alfee" %></title>
+    <title><%= title ? `${t(title)} | Alfee` : "Alfee" %></title>
     <link rel="stylesheet" href="/css/styles.css" />
   </head>
   <body>
@@ -11,6 +11,23 @@
       <div class="container header__content">
         <a class="brand" href="/">Alfee</a>
         <div class="header__right">
+          <form class="locale-switch" method="GET" action="">
+            <label for="locale-select"><%= t("Jezyk") %></label>
+            <select
+              id="locale-select"
+              name="lang"
+              onchange="window.location.href=this.options[this.selectedIndex].value"
+            >
+              <% (localeOptions || []).forEach((item) => { %>
+              <option
+                value="<%= withLocale(item.code) %>"
+                <%= item.code === locale ? "selected" : "" %>
+              >
+                <%= item.label %>
+              </option>
+              <% }) %>
+            </select>
+          </form>
           <nav class="nav">
             <% if (currentUser && currentUser.role === "admin") { %>
             <% if (isAdminManagerMode) { %>
@@ -71,7 +88,7 @@
         </nav>
 
           <% if (currentUser) { %>
-          <% const roleLabel = currentUser.role === "admin" ? "administrator" : currentUser.role === "manager" ? "kierownik" : currentUser.role === "observer" ? "obserwator" : "pracownik"; %>
+          <% const roleLabel = currentUser.role === "admin" ? t("administrator") : currentUser.role === "manager" ? t("kierownik") : currentUser.role === "observer" ? t("obserwator") : t("pracownik"); %>
           <div class="session-user">
             <span class="session-user__label">Zalogowano:</span>
             <strong><%= currentUser.name || currentUser.email %></strong>
@@ -122,5 +139,5 @@
     </header>
     <main class="container content">
       <% if (flash) { %>
-      <div class="flash flash--<%= flash.type %>"><%= flash.text %></div>
+      <div class="flash flash--<%= flash.type %>"><%= t(flash.text) %></div>
       <% } %>

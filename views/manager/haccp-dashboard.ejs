@@ -35,6 +35,52 @@
 
 <section class="card">
   <div class="section-head">
+    <h2>Procesy HACCP</h2>
+    <a class="btn" href="/manager/haccp/processes">Pelna lista</a>
+  </div>
+
+  <% if (!processes || processes.length === 0) { %>
+  <p>Brak procesow HACCP w tej organizacji.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Nazwa</th>
+        <th>Czestotliwosc</th>
+        <th>CCP</th>
+        <th>Aktywny</th>
+        <th>Akcje</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% processes.forEach((process) => { %>
+      <tr>
+        <td>
+          <strong><%= process.name %></strong>
+          <% if (process.description) { %>
+          <div class="muted"><%= process.description %></div>
+          <% } %>
+        </td>
+        <td><%= process.frequency_label || process.frequency_type %></td>
+        <td><%= Number(process.is_ccp) === 1 ? "TAK" : "NIE" %></td>
+        <td><%= Number(process.is_active) === 1 ? "TAK" : "NIE" %></td>
+        <td>
+          <div class="actions">
+            <a class="btn" href="/manager/haccp/processes/<%= process.id %>/edit">Edytuj</a>
+            <% if (Number(process.is_active) === 1) { %>
+            <a class="btn btn--primary" href="/manager/haccp/processes/<%= process.id %>/new-entry">Dodaj wpis</a>
+            <% } %>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+
+<section class="card">
+  <div class="section-head">
     <h2>Otwarte alerty</h2>
     <a class="btn" href="/manager/haccp/alerts?resolved=0">Pelna lista</a>
   </div>
@@ -61,7 +107,7 @@
           </span>
         </td>
         <td><%= alert.process_name || "-" %></td>
-        <td><%= alert.message %></td>
+        <td><%= t(alert.message) %></td>
         <td><%= alert.created_at %></td>
         <td>
           <div class="actions">

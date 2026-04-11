@@ -125,6 +125,7 @@ async function initDatabase() {
       locked_until TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       role TEXT NOT NULL DEFAULT 'employee',
+      deleted_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -153,6 +154,10 @@ async function initDatabase() {
 
   if (!(await tableHasColumn("users", "locked_until"))) {
     await db.run("ALTER TABLE users ADD COLUMN locked_until TEXT");
+  }
+
+  if (!(await tableHasColumn("users", "deleted_at"))) {
+    await db.run("ALTER TABLE users ADD COLUMN deleted_at TEXT");
   }
 
   await db.run("UPDATE users SET is_active = 1 WHERE is_active IS NULL");
@@ -310,7 +315,7 @@ async function initDatabase() {
       name TEXT NOT NULL,
       description TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
-      frequency_type TEXT NOT NULL DEFAULT 'NONE',
+      frequency_type TEXT NOT NULL DEFAULT 'ON_DEMAND',
       frequency_value INTEGER,
       is_ccp INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -322,6 +327,13 @@ async function initDatabase() {
       FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
     )
   `);
+
+  await db.run(
+    "UPDATE haccp_processes SET frequency_type = 'ON_DEMAND' WHERE frequency_type IS NULL OR frequency_type = '' OR frequency_type = 'NONE'"
+  );
+  await db.run(
+    "UPDATE haccp_processes SET frequency_type = 'TWICE_DAILY', frequency_value = COALESCE(NULLIF(frequency_value, 0), 2) WHERE frequency_type = 'MULTIPLE_PER_DAY'"
+  );
 
   await db.run(`
     CREATE TABLE IF NOT EXISTS haccp_process_fields (

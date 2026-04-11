@@ -10,6 +10,8 @@ const {
   normalizeText,
   normalizeDate,
   normalizeRecordedForAt,
+  isLikelyTimeFieldName,
+  normalizeTimeRelatedFieldValue,
   getSeverityForStatus,
   createAuditLog,
   notifyManagers,
@@ -108,16 +110,32 @@ function validateProcessPayload(payload) {
   if (!FREQUENCY_TYPES.includes(payload.frequencyType)) {
     errors.push("Niepoprawny typ czestotliwosci.");
   }
-  if (payload.frequencyType === "MULTIPLE_PER_DAY") {
+
+  if (payload.frequencyType === "EVERY_X_HOURS") {
     if (!payload.frequencyValue || payload.frequencyValue < 1) {
-      errors.push("Dla MULTIPLE_PER_DAY podaj liczbe >= 1.");
+      errors.push("Dla EVERY_X_HOURS podaj liczbe godzin >= 1.");
+    }
+    if (payload.frequencyValue > 24) {
+      errors.push("Dla EVERY_X_HOURS maksymalna wartosc to 24.");
     }
   }
-  if (payload.frequencyType === "DAILY") {
+
+  if (payload.frequencyType === "FIXED_TIMES_DAILY") {
+    if (!payload.frequencyValue || payload.frequencyValue < 1) {
+      errors.push("Dla FIXED_TIMES_DAILY podaj liczbe wykonania >= 1.");
+    }
+  }
+
+  if (
+    payload.frequencyType === "DAILY" ||
+    payload.frequencyType === "SHIFT_START" ||
+    payload.frequencyType === "SHIFT_END"
+  ) {
     if (payload.frequencyValue != null && payload.frequencyValue < 1) {
-      errors.push("Dla DAILY liczba wykonania musi byc >= 1.");
+      errors.push("Wartosc czestotliwosci musi byc >= 1.");
     }
   }
+
   if (!Array.isArray(payload.fields) || payload.fields.length === 0) {
     errors.push("Proces musi miec przynajmniej jedno pole.");
   }
@@ -133,14 +151,17 @@ function parseProcessPayload(body) {
   const isActive = body.isActive == null ? true : parseBoolean(body.isActive);
   const isCcp = parseBoolean(body.isCcp);
   const parsedFields = parseFieldsFromForm(body);
-  const frequencyValue =
-    frequencyType === "NONE"
-      ? null
-      : frequencyValueRaw == null
-        ? frequencyType === "MULTIPLE_PER_DAY"
-          ? 1
-          : null
-        : frequencyValueRaw;
+
+  let frequencyValue = frequencyValueRaw;
+  if (frequencyType === "ON_DEMAND" || frequencyType === "PER_BATCH") {
+    frequencyValue = null;
+  } else if (frequencyType === "TWICE_DAILY") {
+    frequencyValue = 2;
+  } else if (frequencyType === "EVERY_X_HOURS") {
+    frequencyValue = frequencyValueRaw == null ? 4 : frequencyValueRaw;
+  } else if (frequencyType === "FIXED_TIMES_DAILY") {
+    frequencyValue = frequencyValueRaw == null ? 2 : frequencyValueRaw;
+  }
 
   return {
     payload: {
@@ -338,6 +359,89 @@ async function createProcess({ organizationId, userId, body }) {
   }
 }
 
+function normalizeFieldForModelComparison(field, source) {
+  const fromPayload = source === "payload";
+  const allowedValuesRaw = fromPayload
+    ? field.allowedValues
+    : field.allowed_values;
+  const allowedValues = Array.isArray(allowedValuesRaw)
+    ? allowedValuesRaw
+    : normalizeAllowedValues(allowedValuesRaw);
+
+  return {
+    name: normalizeText(field.name).toLowerCase(),
+    type: normalizeFieldType(field.type) || String(field.type || "").toUpperCase(),
+    required: fromPayload
+      ? Boolean(field.required)
+      : Number(field.required) === 1,
+    minValue:
+      field.minValue != null
+        ? Number(field.minValue)
+        : field.min_value != null
+          ? Number(field.min_value)
+          : null,
+    maxValue:
+      field.maxValue != null
+        ? Number(field.maxValue)
+        : field.max_value != null
+          ? Number(field.max_value)
+          : null,
+    allowedValues: allowedValues.map((value) => normalizeText(value)),
+    order: fromPayload
+      ? parseInteger(field.order) || 1
+      : parseInteger(field.field_order) || 1,
+  };
+}
+
+function hasProcessModelChanged(currentProcess, parsedPayload) {
+  const currentFields = (currentProcess.fields || [])
+    .map((field) => normalizeFieldForModelComparison(field, "db"))
+    .sort((left, right) => left.order - right.order);
+  const incomingFields = (parsedPayload.fields || [])
+    .map((field) => normalizeFieldForModelComparison(field, "payload"))
+    .sort((left, right) => left.order - right.order);
+
+  if (currentFields.length !== incomingFields.length) {
+    return true;
+  }
+
+  for (let index = 0; index < currentFields.length; index += 1) {
+    const current = currentFields[index];
+    const incoming = incomingFields[index];
+    if (JSON.stringify(current) !== JSON.stringify(incoming)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function buildArchivedProcessName(organizationId, baseName, processId) {
+  const suffixBase = `${baseName} achived`;
+  let candidate = suffixBase;
+  let suffixCounter = 2;
+
+  while (true) {
+    const existing = await db.get(
+      `
+      SELECT id
+      FROM haccp_processes
+      WHERE
+        organization_id = ?
+        AND lower(name) = lower(?)
+        AND id <> ?
+      `,
+      [organizationId, candidate, processId]
+    );
+
+    if (!existing) {
+      return candidate;
+    }
+
+    candidate = `${suffixBase} ${suffixCounter}`;
+    suffixCounter += 1;
+  }
+}
+
 async function updateProcess({ organizationId, processId, userId, body }) {
   const current = await getProcessWithFields(processId, organizationId, false);
   if (!current) {
@@ -381,23 +485,129 @@ async function updateProcess({ organizationId, processId, userId, body }) {
     };
   }
 
+  const modelChanged = hasProcessModelChanged(current, parsed.payload);
+
   await db.run("BEGIN TRANSACTION");
   try {
+    if (!modelChanged) {
+      await db.run(
+        `
+        UPDATE haccp_processes
+        SET
+          name = ?,
+          description = ?,
+          is_active = ?,
+          frequency_type = ?,
+          frequency_value = ?,
+          is_ccp = ?,
+          updated_at = CURRENT_TIMESTAMP,
+          updated_by = ?
+        WHERE id = ? AND organization_id = ?
+        `,
+        [
+          parsed.payload.name,
+          parsed.payload.description || null,
+          parsed.payload.isActive ? 1 : 0,
+          parsed.payload.frequencyType,
+          parsed.payload.frequencyValue,
+          parsed.payload.isCcp ? 1 : 0,
+          userId,
+          processId,
+          organizationId,
+        ]
+      );
+
+      await db.run("DELETE FROM haccp_process_fields WHERE process_id = ?", [
+        processId,
+      ]);
+
+      for (let index = 0; index < parsed.payload.fields.length; index += 1) {
+        const field = parsed.payload.fields[index];
+        await db.run(
+          `
+          INSERT INTO haccp_process_fields (
+            process_id,
+            name,
+            type,
+            required,
+            min_value,
+            max_value,
+            allowed_values,
+            field_order
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            processId,
+            field.name,
+            field.type,
+            field.required ? 1 : 0,
+            field.minValue,
+            field.maxValue,
+            field.allowedValues.length > 0 ? field.allowedValues.join(",") : null,
+            field.order,
+          ]
+        );
+      }
+
+      await createAuditLog({
+        organizationId,
+        entityType: "Process",
+        entityId: processId,
+        action: "UPDATE",
+        oldValue: {
+          ...current,
+          is_active: Number(current.is_active) === 1,
+          is_ccp: Number(current.is_ccp) === 1,
+        },
+        newValue: parsed.payload,
+        createdBy: userId,
+      });
+
+      await db.run("COMMIT");
+      return {
+        ok: true,
+        processId,
+        modelArchived: false,
+      };
+    }
+
+    const archivedName = await buildArchivedProcessName(
+      organizationId,
+      current.name,
+      processId
+    );
+
     await db.run(
       `
       UPDATE haccp_processes
       SET
         name = ?,
-        description = ?,
-        is_active = ?,
-        frequency_type = ?,
-        frequency_value = ?,
-        is_ccp = ?,
+        is_active = 0,
         updated_at = CURRENT_TIMESTAMP,
         updated_by = ?
       WHERE id = ? AND organization_id = ?
       `,
+      [archivedName, userId, processId, organizationId]
+    );
+
+    const created = await db.run(
+      `
+      INSERT INTO haccp_processes (
+        organization_id,
+        name,
+        description,
+        is_active,
+        frequency_type,
+        frequency_value,
+        is_ccp,
+        created_by,
+        updated_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
       [
+        organizationId,
         parsed.payload.name,
         parsed.payload.description || null,
         parsed.payload.isActive ? 1 : 0,
@@ -405,14 +615,9 @@ async function updateProcess({ organizationId, processId, userId, body }) {
         parsed.payload.frequencyValue,
         parsed.payload.isCcp ? 1 : 0,
         userId,
-        processId,
-        organizationId,
+        userId,
       ]
     );
-
-    await db.run("DELETE FROM haccp_process_fields WHERE process_id = ?", [
-      processId,
-    ]);
 
     for (let index = 0; index < parsed.payload.fields.length; index += 1) {
       const field = parsed.payload.fields[index];
@@ -431,7 +636,7 @@ async function updateProcess({ organizationId, processId, userId, body }) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
-          processId,
+          created.lastID,
           field.name,
           field.type,
           field.required ? 1 : 0,
@@ -451,16 +656,33 @@ async function updateProcess({ organizationId, processId, userId, body }) {
       oldValue: {
         ...current,
         is_active: Number(current.is_active) === 1,
-        is_ccp: Number(current.is_ccp) === 1,
       },
-      newValue: parsed.payload,
+      newValue: {
+        name: archivedName,
+        is_active: false,
+      },
+      createdBy: userId,
+    });
+
+    await createAuditLog({
+      organizationId,
+      entityType: "Process",
+      entityId: created.lastID,
+      action: "CREATE",
+      oldValue: null,
+      newValue: {
+        ...parsed.payload,
+        inheritedFromProcessId: processId,
+      },
       createdBy: userId,
     });
 
     await db.run("COMMIT");
     return {
       ok: true,
-      processId,
+      processId: created.lastID,
+      modelArchived: true,
+      archivedProcessName: archivedName,
     };
   } catch (error) {
     await db.run("ROLLBACK");
@@ -522,8 +744,11 @@ function normalizeEntryPayload(processDefinition, body) {
   for (let index = 0; index < processDefinition.fields.length; index += 1) {
     const field = processDefinition.fields[index];
     const rawValue = body[`field_${field.id}`];
-    const textValue = normalizeText(rawValue);
+    let textValue = normalizeText(rawValue);
     const isRequired = Number(field.required) === 1;
+    const isTimeField =
+      String(field.type || "").toUpperCase() === "TEXT" &&
+      isLikelyTimeFieldName(field.name);
 
     if (isRequired && textValue === "") {
       errors.push(`Pole "${field.name}" jest wymagane.`);
@@ -586,6 +811,17 @@ function normalizeEntryPayload(processDefinition, body) {
       }
       values.push({ fieldId: field.id, value: textValue });
       continue;
+    }
+
+    if (isTimeField) {
+      const normalizedTime = normalizeTimeRelatedFieldValue(textValue);
+      if (!normalizedTime) {
+        errors.push(
+          `Pole "${field.name}" musi byc czasem (HH:MM lub YYYY-MM-DD HH:MM).`
+        );
+        continue;
+      }
+      textValue = normalizedTime;
     }
 
     values.push({ fieldId: field.id, value: textValue });

@@ -1,7 +1,23 @@
 <%- include("../partials/top", { title }) %>
+<%
+  const fieldTypeLabels = {
+    BOOLEAN: `BOOLEAN (${t("Yes/No")})`,
+    NUMBER: `NUMBER (${t("Number")})`,
+    TEXT: `TEXT (${t("Text")})`,
+    SELECT: `SELECT (${t("Select list")})`,
+  };
+%>
 
 <section class="card">
-  <h1><%= formMode === "create" ? "Nowy proces HACCP" : "Edycja procesu HACCP" %></h1>
+  <div class="heading-with-tooltip">
+    <h1><%= formMode === "create" ? "Nowy proces HACCP" : "Edycja procesu HACCP" %></h1>
+    <span class="inline-tooltip">
+      <button type="button" class="tooltip-trigger" aria-label="<%= t('What is HACCP?') %>">?</button>
+      <span class="tooltip-bubble" role="tooltip">
+        <%= t('HACCP means "Hazard Analysis and Critical Control Points".') %>
+      </span>
+    </span>
+  </div>
 
   <% if (errors && errors.length > 0) { %>
   <div class="flash flash--error">
@@ -29,23 +45,28 @@
     <div class="grid haccp-grid-3">
       <label>
         Czestotliwosc
-        <select name="frequencyType">
-          <% frequencyTypes.forEach((type) => { %>
-          <option value="<%= type %>" <%= formData.frequencyType === type ? "selected" : "" %>>
-            <%= type %>
+        <select name="frequencyType" id="frequencyTypeSelect">
+          <% frequencyOptions.forEach((option) => { %>
+          <option
+            value="<%= option.value %>"
+            <%= formData.frequencyType === option.value ? "selected" : "" %>
+          >
+            <%= option.label %>
           </option>
           <% }) %>
         </select>
       </label>
 
       <label>
-        Wartosc czestotliwosci
+        Parametr czestotliwosci
         <input
           type="number"
           min="1"
           name="frequencyValue"
+          id="frequencyValueInput"
           value="<%= formData.frequencyValue %>"
         />
+        <span id="frequencyValueHelp" class="muted"></span>
       </label>
 
       <div class="form-stack">
@@ -58,6 +79,12 @@
           <input type="hidden" name="isCcp" value="0" />
           <input type="checkbox" name="isCcp" value="1" <%= formData.isCcp ? "checked" : "" %> />
           Oznacz jako CCP
+          <span class="inline-tooltip">
+            <button type="button" class="tooltip-trigger" aria-label="<%= t('What is CCP?') %>">?</button>
+            <span class="tooltip-bubble" role="tooltip">
+              <%= t('Marks this process as CCP, e.g. "Thermal processing of meat".') %>
+            </span>
+          </span>
         </label>
       </div>
     </div>
@@ -79,7 +106,9 @@
             Typ
             <select name="fieldType">
               <% fieldTypes.forEach((type) => { %>
-              <option value="<%= type %>" <%= field.type === type ? "selected" : "" %>><%= type %></option>
+              <option value="<%= type %>" <%= field.type === type ? "selected" : "" %>>
+                <%= fieldTypeLabels[type] || type %>
+              </option>
               <% }) %>
             </select>
           </label>
@@ -129,6 +158,84 @@
 <script>
   const fieldsList = document.getElementById("fields-list");
   const addFieldButton = document.getElementById("add-field");
+  const frequencyTypeSelect = document.getElementById("frequencyTypeSelect");
+  const frequencyValueInput = document.getElementById("frequencyValueInput");
+  const frequencyValueHelp = document.getElementById("frequencyValueHelp");
+  const localizedFieldTypeLabels = {
+    BOOLEAN: <%- JSON.stringify(fieldTypeLabels.BOOLEAN) %>,
+    NUMBER: <%- JSON.stringify(fieldTypeLabels.NUMBER) %>,
+    TEXT: <%- JSON.stringify(fieldTypeLabels.TEXT) %>,
+    SELECT: <%- JSON.stringify(fieldTypeLabels.SELECT) %>,
+  };
+
+  function updateFrequencyValueUI() {
+    const type = frequencyTypeSelect.value;
+    const config = {
+      ON_DEMAND: {
+        enabled: false,
+        placeholder: "Brak",
+        help: "Wpis wykonywany ad-hoc, bez stalego harmonogramu.",
+      },
+      PER_BATCH: {
+        enabled: false,
+        placeholder: "Brak",
+        help: "Wpis wykonywany dla kazdej partii.",
+      },
+      SHIFT_START: {
+        enabled: true,
+        placeholder: "Domyslnie 1",
+        help: "Opcjonalnie: liczba wpisow na poczatku zmiany.",
+      },
+      SHIFT_END: {
+        enabled: true,
+        placeholder: "Domyslnie 1",
+        help: "Opcjonalnie: liczba wpisow na koncu zmiany.",
+      },
+      DAILY: {
+        enabled: true,
+        placeholder: "Domyslnie 1",
+        help: "Opcjonalnie: liczba wpisow dziennie.",
+      },
+      TWICE_DAILY: {
+        enabled: false,
+        placeholder: "Stale 2",
+        help: "Stala wartosc 2 wpisy dziennie.",
+      },
+      EVERY_X_HOURS: {
+        enabled: true,
+        placeholder: "np. 4",
+        help: "Wymagane: co ile godzin ma byc wykonany wpis.",
+      },
+      WEEKLY: {
+        enabled: false,
+        placeholder: "Brak",
+        help: "Wpis wykonywany raz na tydzien.",
+      },
+      MONTHLY: {
+        enabled: false,
+        placeholder: "Brak",
+        help: "Wpis wykonywany raz na miesiac.",
+      },
+      FIXED_TIMES_DAILY: {
+        enabled: true,
+        placeholder: "np. 3",
+        help: "Wymagane: ile stalych godzin dziennie wymaga wpisu.",
+      },
+    };
+
+    const current = config[type] || config.ON_DEMAND;
+    frequencyValueInput.disabled = !current.enabled;
+    frequencyValueInput.placeholder = current.placeholder;
+    frequencyValueHelp.textContent = current.help;
+
+    if (!current.enabled) {
+      if (type === "TWICE_DAILY") {
+        frequencyValueInput.value = "2";
+      } else {
+        frequencyValueInput.value = "";
+      }
+    }
+  }
 
   function bindRemoveFieldButtons() {
     document.querySelectorAll(".remove-field").forEach((button) => {
@@ -154,10 +261,10 @@
       <label>
         Typ
         <select name="fieldType">
-          <option value="BOOLEAN">BOOLEAN</option>
-          <option value="NUMBER" selected>NUMBER</option>
-          <option value="TEXT">TEXT</option>
-          <option value="SELECT">SELECT</option>
+          <option value="BOOLEAN">${localizedFieldTypeLabels.BOOLEAN}</option>
+          <option value="NUMBER" selected>${localizedFieldTypeLabels.NUMBER}</option>
+          <option value="TEXT">${localizedFieldTypeLabels.TEXT}</option>
+          <option value="SELECT">${localizedFieldTypeLabels.SELECT}</option>
         </select>
       </label>
       <label>
@@ -189,6 +296,8 @@
     bindRemoveFieldButtons();
   };
 
+  frequencyTypeSelect.addEventListener("change", updateFrequencyValueUI);
+  updateFrequencyValueUI();
   bindRemoveFieldButtons();
 </script>
 

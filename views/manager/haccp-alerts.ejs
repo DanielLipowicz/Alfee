@@ -56,7 +56,7 @@
           -
           <% } %>
         </td>
-        <td><%= alert.message %></td>
+        <td><%= t(alert.message) %></td>
         <td><%= alert.created_at %></td>
         <td><%= Number(alert.resolved) === 1 ? `Rozwiazany (${alert.resolved_at || "-"})` : "Otwarty" %></td>
         <td>

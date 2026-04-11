@@ -29,10 +29,7 @@
         </td>
         <td><%= process.organization_name %></td>
         <td>
-          <%= process.frequency_type %>
-          <% if (process.frequency_value != null) { %>
-          (<%= process.frequency_value %>)
-          <% } %>
+          <%= process.frequency_label || process.frequency_type %>
         </td>
         <td>
           <span class="badge <%= Number(process.is_ccp) === 1 ? 'badge--critical' : 'badge--ok' %>">
@@ -77,7 +74,7 @@
         </td>
         <td><%= alert.process_name %></td>
         <td><a href="/employee/haccp/entries/<%= alert.entry_id %>">#<%= alert.entry_id %></a></td>
-        <td><%= alert.message %></td>
+        <td><%= t(alert.message) %></td>
         <td><%= alert.created_at %></td>
         <td><%= Number(alert.resolved) === 1 ? `Rozwiazany (${alert.resolved_at || "-"})` : "Otwarty" %></td>
       </tr>

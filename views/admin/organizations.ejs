@@ -72,6 +72,7 @@
         <th>Uzytkownik</th>
         <th>Aktualna rola</th>
         <th>Zmien role</th>
+        <th>Usun konto</th>
       </tr>
     </thead>
     <tbody>
@@ -91,6 +92,21 @@
             </select>
             <button class="btn" type="submit">Zapisz</button>
           </form>
+        </td>
+        <td>
+          <% if (currentUser && Number(currentUser.id) === Number(user.id)) { %>
+          <span class="muted">Biezace konto</span>
+          <% } else { %>
+          <form method="POST" action="/admin/users/<%= user.id %>?_method=DELETE">
+            <button
+              class="btn btn--danger"
+              type="submit"
+              onclick="return confirm('Usunac konto tego uzytkownika? Email i dane logowania zostana usuniete, a historia akcji zostanie zachowana po ID.');"
+            >
+              Usun konto
+            </button>
+          </form>
+          <% } %>
         </td>
       </tr>
       <% }) %>

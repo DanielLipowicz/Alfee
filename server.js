@@ -21,6 +21,16 @@ const { ensureAuthenticated } = require("./src/middleware/auth");
 const { loadUserOrganizations } = require("./src/middleware/tenant");
 const { hashPassword, verifyPassword } = require("./src/security/password");
 const { setFlash } = require("./src/utils/flash");
+const {
+  SUPPORTED_LOCALES,
+  DEFAULT_LOCALE,
+  LOCALE_LABELS,
+  normalizeLocale,
+  detectLocaleFromHeader,
+  translate,
+  translateHtml,
+  withLocale,
+} = require("./src/i18n");
 
 const app = express();
 const SQLiteStore = SQLiteStoreFactory(session);
@@ -255,6 +265,55 @@ app.use(
   })
 );
 
+app.use((req, res, next) => {
+  const queryLocale = normalizeLocale(req.query?.lang);
+  if (queryLocale && req.session) {
+    req.session.locale = queryLocale;
+  }
+
+  const sessionLocale = normalizeLocale(req.session?.locale);
+  const headerLocale = detectLocaleFromHeader(req.get("accept-language"));
+  const locale = queryLocale || sessionLocale || headerLocale || DEFAULT_LOCALE;
+
+  req.locale = locale;
+  req.t = (sourceText) => translate(locale, sourceText);
+  res.locals.locale = locale;
+  res.locals.t = req.t;
+  res.locals.localeOptions = SUPPORTED_LOCALES.map((code) => ({
+    code,
+    label: LOCALE_LABELS[code] || code.toUpperCase(),
+  }));
+  res.locals.withLocale = (code) => withLocale(req.originalUrl, code);
+
+  next();
+});
+
+app.use((req, res, next) => {
+  const originalRender = res.render.bind(res);
+
+  res.render = (view, options, callback) => {
+    const done = typeof options === "function" ? options : callback;
+    const locals = typeof options === "function" ? undefined : options;
+
+    return originalRender(view, locals, (error, html) => {
+      if (error) {
+        if (typeof done === "function") {
+          return done(error);
+        }
+        return next(error);
+      }
+
+      const translatedHtml = translateHtml(req.locale, html);
+      if (typeof done === "function") {
+        return done(null, translatedHtml);
+      }
+      return res.send(translatedHtml);
+    });
+  };
+
+  next();
+});
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -403,6 +462,12 @@ app.get("/", (req, res) => {
   }
   return res.render("home", {
     title: "Lista zadan zespolu",
+  });
+});
+
+app.get("/o-produkcie", (_req, res) => {
+  return res.render("about-product", {
+    title: "O produkcie",
   });
 });
 

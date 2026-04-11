@@ -101,7 +101,7 @@
             <%= alert.severity %>
           </span>
         </td>
-        <td><%= alert.message %></td>
+        <td><%= t(alert.message) %></td>
         <td><%= alert.created_at %></td>
         <td><%= Number(alert.resolved) === 1 ? `TAK (${alert.resolved_at || "-"})` : "NIE" %></td>
       </tr>

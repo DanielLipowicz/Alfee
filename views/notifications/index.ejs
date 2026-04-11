@@ -17,14 +17,14 @@
     <% notifications.forEach((notification) => { %>
     <article class="notification-item <%= notification.is_read === 1 ? 'notification-item--read' : '' %>">
       <div class="notification-head">
-        <strong><%= notification.title %></strong>
+        <strong><%= t(notification.title) %></strong>
         <% if (notification.is_read !== 1) { %>
         <span class="badge badge--progress">Nowe</span>
         <% } else { %>
         <span class="muted">Przeczytane</span>
         <% } %>
       </div>
-      <p><%= notification.message %></p>
+      <p><%= t(notification.message) %></p>
       <p class="muted"><%= notification.created_at %></p>
       <div class="actions">
         <% if (notification.url) { %>

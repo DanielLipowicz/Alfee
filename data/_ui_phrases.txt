@@ -1,0 +1,715 @@
+﻿-- brak --
+-- wybierz --
+".js-toggle-step-button"
+"Na telefonie mozesz zrobic zdjecie aparatem. Na komputerze mozesz wybrac wiele zdjec naraz.";
+"step-feedback--error",
+"step-feedback--pending",
+"step-feedback--success",
+"success"
+(item) => item.dataset.completed !== "1"
+(item) => item.dataset.evidenceId === String(evidenceId)
+(payload && payload.error) || "Nie udalo sie zaktualizowac statusu."
+(wymagane)
+: "Oznacz jako ukonczona";
+: payload.evidence
+? "Cofnij ukonczenie"
+? [payload.evidence]
+? payload.evidenceItems
+} catch (_error) {
+} catch (error) {
+} else {
+} finally {
+<%- include("../partials/task-comments", {
+<button
+<div
+<form
+<input
+<li
+<option
+<select
+<span
+<span class="hint"
+<strong class="js-assignment-progress"
+<textarea
+> / ( %)</strong
+>Brak konfiguracji Google OAuth. Uzupelnij plik .env .</span
+1. Role i dostepy
+2. Organizacje i praca wielo-tenantowa
+3. Zarzadzanie kontami
+4. Modul zadan operacyjnych
+5. Realizacja zadan przez pracownika
+6. Dowody wykonania i komunikacja
+7. Modul HACCP
+8. Powiadomienia i nadzor
+9. Bezpieczenstwo
+Accept: "application/json",
+accept="image/*"
+action=" "
+action="/admin/memberships/ / ?_method=DELETE"
+action="/employee/tasks/ /steps/ /evidence"
+action="/employee/tasks/ /steps/ /evidence/ /delete"
+action="/employee/tasks/ /steps/ /toggle"
+addButton.onclick = () => {
+addFieldButton.onclick = () => {
+administrator
+Administrator tworzy organizacje i przypisuje do nich kierownikow, pracownikow oraz obserwatorow.
+Administrator zarzadza organizacjami oraz czlonkostwami.
+Administrator: organizacje, role, czlonkostwa, tryb kierownika.
+Akcja
+Akcje
+Aktualna rola
+Aktualne haslo
+Aktywne procesy
+Aktywny
+Aktywny tryb kierownika dla organizacji:
+Alert:
+Alerty
+Alerty HACCP
+Alerty powiazane
+Alerty powiazane z moimi wpisami
+Alfee
+Alfee - platforma do codziennej kontroli pracy i jakosci
+Alfee laczy codzienne zarzadzanie zadaniami z kontrola jakosci HACCP.
+Alfee pomaga uporzadkowac obowiazki zespolu, przyspiesza obieg informacji i
+Allowed (SELECT)
+Anuluj
+appendEvidence(stepItem, evidenceItems[index]);
+aria-label="Nowa nazwa organizacji"
+aria-label="Postep wykonania"
+aria-valuemax="100"
+aria-valuemin="0"
+aria-valuenow=" "
+async function parseJson(response) {
+async function submitDeleteEvidence(form, stepItem) {
+async function submitEvidence(form, stepItem) {
+async function submitToggle(form, stepItem) {
+autocomplete="current-password"
+autocomplete="email"
+autocomplete="name"
+autocomplete="new-password"
+Automatyczne przeliczanie postepu i statusu wykonania.
+Autor
+Autor:
+await navigator.clipboard.writeText(input.value);
+badge.classList.toggle("badge--done", isCompleted);
+badge.classList.toggle("badge--progress", !isCompleted);
+badge.textContent = isCompleted ? "Ukonczona" : "Niewykonana";
+behavior: "smooth",
+Biezace konto
+bindDeleteEvidenceForm(deleteForm, stepItem);
+bindDeleteEvidenceForm(form, stepItem);
+bindRemoveActions();
+bindRemoveFieldButtons();
+block: "center",
+Blokada konta po wielu nieudanych probach logowania.
+body: formData,
+BOOLEAN
+Brak aktywnych procesow HACCP przypisanych do Twoich organizacji.
+Brak alertow.
+Brak danych dla podanych filtrow.
+Brak dostępnych pracowników. Najpierw pracownik musi zalogować się do
+Brak dzialan korygujacych.
+Brak komentarzy.
+Brak organizacji
+Brak organizacji.
+Brak otwartych alertow.
+Brak powiadomien.
+Brak przydzielonych zadań.
+Brak przypisanych uzytkownikow.
+Brak uzytkownikow do przypisania.
+Brak uzytkownikow.
+Brak wartosci.
+Brak wpisow HACCP.
+Brak wpisow spelniajacych warunki.
+Brak wykonan zadan.
+Brak zdefiniowanych procesow HACCP.
+Brak zdjec dowodowych.
+button.addEventListener("click", async () => {
+button.classList.toggle("btn--primary", !isCompleted);
+button.closest(".haccp-field-row").remove();
+button.closest(".step-row").remove();
+button.disabled = false;
+button.disabled = true;
+button.onclick = () => {
+button.textContent = isCompleted
+caption.textContent = `Dodano: ${evidence.uploaded_at || "Przed chwila"}`;
+capture="environment"
+CCP
+CCP:
+class="badge js-assignment-status-badge "
+class="btn btn--danger"
+class="btn"
+class="credential-copy-input"
+class="evidence-actions js-delete-evidence-form"
+class="form-stack"
+class="js-evidence-form step-evidence-form"
+class="js-evidence-input step-evidence-input"
+class="js-toggle-step-form"
+class="step-item js-step-item "
+class="steps-progress__track js-assignment-progress-track"
+Co otrzymuje Twoja firma
+commentAction: `/employee/tasks/${assignment.id}/comments`,
+commentAction: `/manager/assignments/${assignment.id}/comments`,
+commentAction: `/observer/assignments/${assignment.id}/comments`,
+comments,
+const { completed_steps, total_steps, percentage } = assignment.progress;
+const addButton = document.getElementById("add-step");
+const addFieldButton = document.getElementById("add-field");
+const badge = stepItem.querySelector(".js-step-badge");
+const button = document.getElementById("copy-generated-observer-password");
+const button = form.querySelector(".js-toggle-step-button");
+const button = form.querySelector("button");
+const button = stepItem.querySelector(".js-toggle-step-button");
+const caption = document.createElement("figcaption");
+const config = {
+const confirmed = window.confirm("Czy na pewno chcesz usunac to zdjecie?");
+const current = config[type] || config.ON_DEMAND;
+const deleteButton = document.createElement("button");
+const deleteForm = document.createElement("form");
+const deleteForms = stepItem.querySelectorAll(".js-delete-evidence-form");
+const evidenceForm = stepItem.querySelector(".js-evidence-form");
+const evidenceHint = stepItem.querySelector(".js-evidence-hint");
+const evidenceInput = evidenceForm.querySelector(".js-evidence-input");
+const evidenceItem = Array.from(grid.querySelectorAll(".js-evidence-item")).find(
+const evidenceItems = Array.isArray(payload.evidenceItems)
+const feedback = document.getElementById("copy-generated-observer-password-feedback");
+const feedback = stepItem.querySelector(".js-step-feedback");
+const feedbackClasses = [
+const fieldsList = document.getElementById("fields-list");
+const figure = document.createElement("figure");
+const firstIncompleteButton = firstIncompleteStep.querySelector(
+const firstIncompleteStep = Array.from(stepItems).find(
+const formData = new FormData(form);
+const frequencyTypeSelect = document.getElementById("frequencyTypeSelect");
+const frequencyValueHelp = document.getElementById("frequencyValueHelp");
+const frequencyValueInput = document.getElementById("frequencyValueInput");
+const grid = stepItem.querySelector(".js-evidence-grid");
+const image = document.createElement("img");
+const input = document.getElementById("generated-observer-password");
+const input = form.querySelector(".js-evidence-input");
+const isCompleted = assignment.status === "completed";
+const isCompleted = Number(completed) === 1;
+const list = document.getElementById("steps-list");
+const nextOrder = fieldsList.querySelectorAll(".haccp-field-row").length + 1;
+const noEvidence = stepItem.querySelector(".js-no-evidence");
+const payload = await parseJson(response);
+const progressBar = document.querySelector(".js-assignment-progress-bar");
+const progressText = document.querySelector(".js-assignment-progress");
+const progressTrack = document.querySelector(".js-assignment-progress-track");
+const response = await fetch(form.action, {
+const row = document.createElement("div");
+const rows = fieldsList.querySelectorAll(".haccp-field-row");
+const statusBadge = document.querySelector(".js-assignment-status-badge");
+const stepItems = document.querySelectorAll(".js-step-item");
+const toggleForm = stepItem.querySelector(".js-toggle-step-form");
+const totalRows = reportGroups.reduce((sum, group) => sum + group.rows.length, 0);
+const type = frequencyTypeSelect.value;
+Czestotliwosc
+czlonkow, zadan
+Czynnosci
+Czynnosci do wykonania
+Czynności do wykonania
+DAILY: {
+Dane startowe obserwatora
+Dashboard
+Dashboard kierownika z metrykami i najnowszymi wykonaniami.
+Data
+Data do
+Data i godzina, dla ktorej wpis ma zastosowanie
+Data od
+data-completed=" "
+data-step-id=" "
+Definicja pol
+Definiowanie procesow HACCP, pol kontrolnych i czestotliwosci.
+deleteButton.className = "btn btn--danger";
+deleteButton.textContent = "Usun zdjecie";
+deleteButton.type = "submit";
+deleteForm.action = `/employee/tasks/ /steps/${stepItem.dataset.stepId}/evidence/${evidence.id}/delete`;
+deleteForm.append(deleteButton);
+deleteForm.className = "evidence-actions js-delete-evidence-form";
+deleteForm.method = "POST";
+deleteForms.forEach((form) => {
+document.execCommand("copy");
+document.querySelectorAll(".remove-field").forEach((button) => {
+document.querySelectorAll(".remove-step").forEach((button) => {
+Dodaj
+Dodaj czlonkostwo
+Dodaj czynność
+Dodaj komentarz
+Dodaj pole
+Dodaj wpis
+Dodano:
+Dodawanie wielu zdjec jako dowod do konkretnego kroku.
+Dodawanie wpisow HACCP przez pracownikow.
+Dokumentacja HACCP z walidacja, audytem, alertami i dzialaniami korygujacymi.
+Dotyczy czasu:
+Dotyczy godz.
+Dowod (zdjecie)
+Dzialania korygujace
+Dzialanie korygujace (wymagane dla ALERT/CRITICAL)
+Dzieki temu firma zyskuje jedno narzedzie do planowania pracy, monitorowania
+Edycja imienia i nazwiska
+Edycja profilu i samodzielna zmiana hasla przez uzytkownika.
+Edycja, kopiowanie i usuwanie szablonow.
+Edytuj
+Eksport CSV
+Eksport PDF
+Eksport raportow HACCP do CSV i PDF.
+Email
+Email logowania:
+Email obserwatora
+enabled: false,
+enabled: true,
+enctype="multipart/form-data"
+event.preventDefault();
+EVERY_X_HOURS: {
+evidenceForm.addEventListener("submit", (event) => {
+evidenceHint.textContent =
+evidenceInput.addEventListener("change", () => {
+evidenceItem.remove();
+feedback.classList.add(`step-feedback--${type}`);
+feedback.classList.remove(...feedbackClasses);
+feedback.textContent = "Haslo skopiowane do schowka.";
+feedback.textContent = "Nie udalo sie skopiowac automatycznie. Skopiuj haslo recznie.";
+feedback.textContent = message || "";
+fieldsList.appendChild(row);
+figure.append(image, caption, deleteForm);
+figure.className = "evidence-item js-evidence-item";
+figure.dataset.evidenceId = String(evidence.id);
+Filtruj
+firstIncompleteButton.focus();
+firstIncompleteStep.scrollIntoView({
+FIXED_TIMES_DAILY: {
+for (let index = evidenceItems.length - 1; index >= 0; index -= 1) {
+form.addEventListener("submit", (event) => {
+form.dataset.busy = "0";
+form.dataset.busy = "1";
+frequencyTypeSelect.addEventListener("change", updateFrequencyValueUI);
+frequencyValueHelp.textContent = current.help;
+frequencyValueInput.disabled = !current.enabled;
+frequencyValueInput.placeholder = current.placeholder;
+frequencyValueInput.value = "";
+frequencyValueInput.value = "2";
+function appendEvidence(stepItem, evidence) {
+function bindDeleteEvidenceForm(form, stepItem) {
+function bindRemoveActions() {
+function bindRemoveFieldButtons() {
+function removeEvidence(stepItem, evidenceId) {
+function scrollToFirstIncompleteStep() {
+function setEvidenceAvailability(stepItem, isCompleted) {
+function setFeedback(stepItem, message, type) {
+function updateAssignment(assignment) {
+function updateFrequencyValueUI() {
+function updateStep(stepItem, completed) {
+Generuj
+GOOGLE_CALLBACK_URL .
+GOOGLE_CLIENT_ID , GOOGLE_CLIENT_SECRET i
+grid.hidden = false;
+grid.hidden = true;
+grid.prepend(figure);
+HACCP
+HACCP - moje procesy
+Haslo
+Haslo musi miec min. 10 znakow, mala i wielka litere, cyfre oraz znak
+Haslo musi miec min. 10 znakow, mala i wielka litere, cyfre oraz znak specjalny.
+Haslo startowe (pokazane tylko raz)
+Haszowanie hasel algorytmem scrypt.
+headers: {
+help: "Opcjonalnie: liczba wpisow dziennie.",
+help: "Opcjonalnie: liczba wpisow na koncu zmiany.",
+help: "Opcjonalnie: liczba wpisow na poczatku zmiany.",
+help: "Stala wartosc 2 wpisy dziennie.",
+help: "Wpis wykonywany ad-hoc, bez stalego harmonogramu.",
+help: "Wpis wykonywany dla kazdej partii.",
+help: "Wpis wykonywany raz na miesiac.",
+help: "Wpis wykonywany raz na tydzien.",
+help: "Wymagane: co ile godzin ma byc wykonany wpis.",
+help: "Wymagane: ile stalych godzin dziennie wymaga wpisu.",
+href="/manager/haccp/reports/export.csv?dateFrom= &dateTo= &status= &processId= &createdBy= "
+href="/manager/haccp/reports/export.pdf?dateFrom= &dateTo= &status= &processId= &createdBy= "
+id="evidence- "
+id="frequencyValueInput"
+id="generated-observer-password"
+id="locale-select"
+id="organizationId"
+if (!assignment || !assignment.progress) {
+if (!confirmed) {
+if (!current.enabled) {
+if (!evidence || !evidence.image_path || evidence.id == null) {
+if (!feedback) {
+if (!firstIncompleteStep) {
+if (!grid) {
+if (!input || !button) {
+if (!input) {
+if (!input.files || input.files.length === 0) {
+if (!response.ok || !payload || !payload.ok) {
+if (!statusBadge || !progressText || stepItems.length === 0) {
+if (badge) {
+if (button) {
+if (evidenceForm) {
+if (evidenceHint) {
+if (evidenceInput) {
+if (evidenceInput.files && evidenceInput.files.length > 0) {
+if (evidenceItem) {
+if (feedback) {
+if (firstIncompleteButton) {
+if (form.dataset.busy === "1") {
+if (grid.children.length === 0) {
+if (list.querySelectorAll(".step-row").length <= 1) {
+if (navigator.clipboard && window.isSecureContext) {
+if (noEvidence) {
+if (Number(payload.step.completed) === 1) {
+if (progressBar) {
+if (progressTrack) {
+if (rows.length <= 1) {
+if (toggleForm) {
+if (type === "TWICE_DAILY") {
+if (type) {
+image.alt = "Zdjecie dowodowe";
+image.src = evidence.image_path;
+Imie i nazwisko
+Imie i nazwisko:
+Informacja
+input.disabled = false;
+input.disabled = true;
+input.focus();
+input.select();
+input.setSelectionRange(0, input.value.length);
+input.value = "";
+izolowane tenantowo i uporzadkowane wedlug aktywnej organizacji.
+Jeden system dla wielu organizacji
+Jedna nitka komentarzy dla kierownika, pracownika i obserwatora.
+Jesli wpis ma status ALERT/CRITICAL, wymagane jest dzialanie korygujace i moze pojawic sie alert.
+Juz aktywna (otworz panel)
+kierownik
+Kierownik i obserwator widza postep na poziomie konkretnego wykonania,
+Kierownik tworzy i przydziela zadania tylko w aktywnej organizacji.
+Kierownik: zadania, przydzialy, pracownicy, obserwatorzy, HACCP.
+Kolejnosc
+Komentarze
+Komentarze do wykonania dostepne dla uczestnikow procesu.
+Komentarze sa jawne dla uczestnikow tego wykonania zadania.
+Komentarze wykonania
+Konto jest aktywne od razu po utworzeniu.
+Konto zostanie utworzone jako lokalne i od razu przypisane do aktywnej organizacji.
+Konto:
+Kontrola HACCP i raportowanie
+Kontynuuj z Google
+Kopiuj
+Krok
+krok po kroku, razem z dowodami i komentarzami.
+Krytyczne alerty
+Liczba wykonan
+Licznik nieprzeczytanych powiadomien w naglowku.
+list.appendChild(row);
+Lista organizacji
+Lista powiadomien z przejsciem bezposrednio do sprawy.
+Lista przydzialow z postepem, statusem i organizacja.
+Logowanie
+Logowanie Google
+Logowanie Google nie jest skonfigurowane. Uzupelnij:
+Masz juz konto? Przejdz do logowania
+Max (NUMBER)
+maxlength="120"
+maxlength="2000"
+method: "POST",
+method="POST"
+Metryka
+Min (NUMBER)
+min="1"
+Moje wpisy
+Moje wykonania zadan
+Moje zadania
+MONTHLY: {
+multiple
+Na telefonie mozesz zrobic zdjecie aparatem. Na komputerze mozesz wybrac wiele zdjec naraz.
+Najnowsze przydziały
+Najnowsze wpisy
+Najpierw utworz organizacje.
+name=" "
+name="commentText"
+name="confirmPassword"
+name="currentPassword"
+name="email"
+name="evidenceImage"
+name="fieldAllowedValues"
+name="frequencyValue"
+name="lang"
+name="name"
+name="organizationId"
+name="passwordConfirm"
+name="recordedForAt"
+Nazwa
+Nazwa organizacji
+Nazwa procesu
+Nazwa zadania
+NIE
+Nie dodano jeszcze wpisow HACCP.
+Nie masz jeszcze przydzielonych wykonan.
+Nie masz jeszcze przypisanych zadan do obserwacji.
+Nie masz konta? Zarejestruj sie
+Nie utworzono jeszcze zadnego zadania.
+noEvidence.hidden = false;
+noEvidence.hidden = true;
+Nowa organizacja
+Nowe
+Nowe haslo
+Nowe konto obserwatora
+Nowe konto pracownika
+Nowe zadanie
+Nowy pracownik/obserwator
+Nowy proces
+Nowy wpis HACCP
+NUMBER
+O produkcie
+obserwator
+Obserwator monitoruje postep przypisanych zadan.
+Obserwator: podglad postepu i komentarze do realizacji.
+Obserwowane zadania
+Obserwowane zadania (szablony)
+ON_DEMAND: {
+onchange="this.form.submit()"
+onchange="window.location.href=this.options[this.selectedIndex].value"
+onclick="return confirm('Usunac konto tego uzytkownika? Email i dane logowania zostana usuniete, a historia akcji zostanie zachowana po ID.');"
+onclick="return confirm('Usuniecie organizacji usunie wszystkie jej zadania i przydzialy. Kontynuowac?');"
+Opcjonalne logowanie Google OAuth 2.0.
+Opis
+Organizacja
+Organizacja:
+Organizacje
+Otwarte
+Otwarte alerty
+Otworz
+Oznacz jako CCP
+Oznacz jako przeczytane
+Oznacz krok jako wykonany, a potem dodaj zdjecie dowodowe. Po wyborze pliku wysylka startuje automatycznie.
+Oznacz wszystko jako przeczytane
+Oznaczanie krokow jako wykonane / niewykonane.
+Oznaczanie pojedynczo i zbiorczo jako przeczytane.
+Panel
+Panel kierownika
+Parametr czestotliwosci
+payload.message || "Dodano zdjecia jako dowod wykonania.",
+Pelna lista
+Pelna widocznosc pracy
+Pełny podgląd
+Pelny zakres funkcjonalnosci
+PER_BATCH: {
+placeholder: "Brak",
+placeholder: "Domyslnie 1",
+placeholder: "np. 3",
+placeholder: "np. 4",
+placeholder: "Stale 2",
+placeholder="np. TAK, NIE, N/A"
+placeholder="Wpisz komentarz dotyczacy tego wykonania"
+Podaj tylko adres email. System wygeneruje haslo startowe, ktore kierownik moze przekazac nowemu obserwatorowi.
+Podsumowanie dla klienta
+Pola
+Pole
+Postep
+Postęp
+Postep wykonania
+Postep:
+Postep: / ( %)
+Powiadomienia
+Powiadomienie kierownika po zakonczeniu calego zadania.
+Powiazanie zadania z obserwatorem (opcjonalnie).
+Powrot
+Powrot do alertow
+Powrot do panelu
+Powtorz haslo
+Powtorz nowe haslo
+Pracownicy
+pracownik
+Pracownik realizuje swoje zadania i dodaje zdjecia jako dowody.
+Pracownik:
+Pracownik: realizacja przydzialow, dowody, wpisy HACCP.
+Priorytet
+Proces
+Proces aktywny
+Proces:
+Procesy HACCP
+Procesy, wpisy, alerty, review i eksporty raportow (CSV/PDF) sa dostepne
+Profil
+Profil uzytkownika
+progressBar.style.width = `${percentage}%`;
+progressText.textContent = `${completed_steps}/${total_steps} (${percentage}%)`;
+progressTrack.setAttribute("aria-valuenow", String(percentage));
+Projekt jest gotowy do pracy w wielu organizacjach i wspiera rozne role
+Przeczytane
+Przelaczanie aktywnej organizacji przez kierownika z poziomu naglowka.
+Przydzialy
+Przydziały
+Przydziel
+Przydziel zadanie
+Przydzielanie zadan pracownikom z tej samej organizacji.
+Przyklad: "Obrobka termiczna miesa". HACCP to "Analiza Zagrozen i Krytyczne Punkty Kontroli".
+Przypisywanie uzytkownikow do wielu organizacji (membership).
+Raporty filtrowane po dacie, statusie, procesie i pracowniku.
+readonly
+realizacji i dokumentowania zgodnosci operacyjnej.
+redirectTo: `/employee/tasks/${assignment.id}`,
+redirectTo: `/manager/assignments/${assignment.id}`,
+redirectTo: `/observer/tasks/${assignment.task_id}/assignments/${assignment.id}`,
+Rejestracja
+Rejestracja lokalna i logowanie lokalne (email + haslo).
+removeEvidence(stepItem, payload.evidenceId);
+required
+Reset
+return await response.json();
+return null;
+return;
+Review
+Review wpisow przez kierownika i zapis dzialan korygujacych.
+Review:
+Rola
+Rola:
+Role uzytkownikow
+role="progressbar"
+row.className = "haccp-field-row";
+row.className = "step-row";
+row.innerHTML = `
+rows="3"
+Rozwiazane
+Rozwiazany
+scrollToFirstIncompleteStep();
+SELECT
+Sesje z bezpiecznymi cookie i wsparciem pracy za reverse proxy HTTPS.
+setEvidenceAvailability(stepItem, isCompleted);
+setEvidenceAvailability(stepItem, stepItem.dataset.completed === "1");
+setFeedback(
+setFeedback(stepItem, "Usuwanie zdjecia...", "pending");
+setFeedback(stepItem, "Wybierz plik graficzny do wyslania.", "error");
+setFeedback(stepItem, "Wysylanie zdjecia...", "pending");
+setFeedback(stepItem, "Zapisywanie statusu...", "pending");
+setFeedback(stepItem, error.message, "error");
+setFeedback(stepItem, payload.message || "Usunieto zdjecie.", "success");
+setFeedback(stepItem, payload.message || "Zaktualizowano status.", "success");
+setTimeout(() => {
+SHIFT_END: {
+SHIFT_START: {
+Silna polityka hasel (dlugosc + mala/wielka litera + cyfra + znak specjalny).
+specjalny.
+Status
+Status:
+statusBadge.classList.toggle("badge--done", isCompleted);
+statusBadge.classList.toggle("badge--progress", !isCompleted);
+statusBadge.textContent = isCompleted ? "Ukonczone" : "W toku";
+Statusy wpisow (np. OK/ALERT/CRITICAL) i oznaczenie CCP.
+stepItem,
+stepItem.classList.toggle("step-item--completed", isCompleted);
+stepItem.dataset.completed = isCompleted ? "1" : "0";
+stepItems.forEach((stepItem) => {
+submitDeleteEvidence(form, stepItem);
+submitEvidence(evidenceForm, stepItem);
+submitToggle(toggleForm, stepItem);
+System do zarzadzania zadaniami zespolu i procesami HACCP.
+System zadan dla wielu organizacji
+systemu przez Google.
+Szablon zadania
+Szczegoly
+TAK
+Ten sam uzytkownik moze dzialac w kilku organizacjach, a dane sa
+TEXT
+throw new Error(
+throw new Error((payload && payload.error) || "Nie udalo sie dodac zdjecia.");
+throw new Error((payload && payload.error) || "Nie udalo sie usunac zdjecia.");
+To zadanie nie ma jeszcze zadnego wykonania.
+toggleForm.addEventListener("submit", (event) => {
+Tresc
+try {
+Tryb kierownika:
+TWICE_DAILY: {
+Tworzenie kont obserwatorow z haslem startowym pokazanym jednorazowo.
+Tworzenie kont pracownikow przez kierownika (od razu z przypisaniem).
+Tworzenie szablonow zadan z lista krokow (czynnosci).
+Tworzenie, edycja i usuwanie organizacji przez administratora.
+Typ
+Typ konta:
+type="datetime-local"
+type="email"
+type="file"
+type="number"
+type="password"
+type="submit"
+type="text"
+updateAssignment(payload.assignment);
+updateFrequencyValueUI();
+updateStep(stepItem, payload.step.completed);
+Usun
+Usuń
+Usun konto
+Usun organizacje
+Usun zdjecie
+Usuwanie blednych dowodow i podglad historii zalacznikow.
+Utworz konto
+Utworz konto obserwatora
+Utworz konto pracownika
+Utworz organizacje
+Utworzono
+Utworzono:
+Uzupelnij
+Uzupelnij brakujacy wpis HACCP
+Uzupelnij wpis
+Uzytkownik
+uzytkownikow.
+value=" "
+w jednym miejscu, z historia zmian i statusem.
+W trakcie
+Wartosc
+Wartosci formularza
+WEEKLY: {
+Wejdz w tryb kierownika
+Widocznosc danych ograniczona do uprawnionych organizacji.
+Wpis
+Wpis HACCP #
+Wpis zostal juz zatwierdzony.
+Wpis/Odniesienie
+Wpisy
+Wpisy dzisiaj
+Wpisy HACCP
+Wpisy i raporty
+Wpisy i raporty HACCP
+Wróć do zadań
+Wroc do zadania
+Wróć na stronę główną
+Wskazowka: opcja "Oznacz jako CCP" sluzy do oznaczenia procesu jako Krytyczny Punkt Kontroli.
+Wszyscy
+Wszystkie
+Wybierz
+Wybierz pracownika
+Wyjdz z trybu
+Wykonania ukonczone
+Wykonania zadan
+Wykonania zadania
+Wykonanie zadania:
+Wykrywanie alertow, uzupelnianie brakow i zamykanie alertow.
+Wyloguj
+Wymagane
+Wynik ( wpisow)
+Wyslij powiadomienie do pracownika
+Zadania
+Zadanie
+Zadanie (szablon):
+Zadanie:
+Zakres:
+Zalogowano:
+Zaloguj
+Zaloguj lokalnie
+Zaloguj przez Google
+Zaloguj sie
+Zaloguj sie emailem i haslem.
+Zaloz konto
+Zamknij
+zapewnia czytelny nadzor nad wykonaniem zadan oraz procesami HACCP.
+Zapisz
+Zapisz brakujacy wpis
+Zapisz imie i nazwisko
+Zapisz wpis
+Zarejestruj konto
+Zatwierdz
+Zatwierdz wpis
+Zatwierdzony:
+Zmiana hasla
+Zmien haslo
+Zmien role

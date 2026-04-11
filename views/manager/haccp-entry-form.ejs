@@ -2,8 +2,8 @@
 
 <section class="card narrow">
   <div class="section-head">
-    <h1>Nowy wpis HACCP</h1>
-    <a class="btn" href="/employee/haccp">Powrot</a>
+    <h1>Nowy wpis procesu HACCP</h1>
+    <a class="btn" href="/manager/haccp">Powrot</a>
   </div>
 
   <p class="muted">
@@ -24,7 +24,7 @@
   </div>
   <% } %>
 
-  <form method="POST" action="/employee/haccp/processes/<%= process.id %>/entries" class="form-stack">
+  <form method="POST" action="/manager/haccp/processes/<%= process.id %>/entries" class="form-stack">
     <label>
       Dotyczy czasu
       <input
@@ -98,7 +98,7 @@
 
     <div class="actions">
       <button class="btn btn--primary" type="submit">Zapisz wpis</button>
-      <a class="btn" href="/employee/haccp">Anuluj</a>
+      <a class="btn" href="/manager/haccp">Anuluj</a>
     </div>
   </form>
 </section>

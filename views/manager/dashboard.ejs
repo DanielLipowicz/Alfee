@@ -2,39 +2,39 @@
 
 <section class="grid stats">
   <article class="card">
-    <h2>Zadania</h2>
+    <h2><%= t("Tasks") %></h2>
     <strong><%= stats.tasks %></strong>
   </article>
   <article class="card">
-    <h2>Pracownicy</h2>
+    <h2><%= t("Employees") %></h2>
     <strong><%= stats.employees %></strong>
   </article>
   <article class="card">
-    <h2>Przydziały</h2>
+    <h2><%= t("Assignments") %></h2>
     <strong><%= stats.assignments %></strong>
   </article>
   <article class="card">
-    <h2>W trakcie</h2>
+    <h2><%= t("In progress") %></h2>
     <strong><%= stats.active %></strong>
   </article>
 </section>
 
 <section class="card">
   <div class="section-head">
-    <h2>Najnowsze przydziały</h2>
-    <a class="btn" href="/manager/assignments">Pełny podgląd</a>
+    <h2><%= t("Latest assignments") %></h2>
+    <a class="btn" href="/manager/assignments"><%= t("Full overview") %></a>
   </div>
 
   <% if (recentAssignments.length === 0) { %>
-  <p>Brak przydzielonych zadań.</p>
+  <p><%= t("No assigned tasks.") %></p>
   <% } else { %>
   <table>
     <thead>
       <tr>
-        <th>Zadanie</th>
-        <th>Pracownik</th>
-        <th>Postęp</th>
-        <th>Status</th>
+        <th><%= t("Task") %></th>
+        <th><%= t("Employee") %></th>
+        <th><%= t("Progress") %></th>
+        <th><%= t("Status") %></th>
       </tr>
     </thead>
     <tbody>
@@ -45,7 +45,7 @@
         <td><%= item.completed_steps %>/<%= item.total_steps %> (<%= item.percentage %>%)</td>
         <td>
           <span class="badge <%= item.status === 'completed' ? 'badge--done' : 'badge--progress' %>">
-            <%= item.status === "completed" ? "Ukończone" : "W toku" %>
+            <%= item.status === "completed" ? t("Completed") : t("In progress") %>
           </span>
         </td>
       </tr>

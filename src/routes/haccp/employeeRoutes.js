@@ -6,6 +6,7 @@ const { setFlash } = require("../../utils/flash");
 const {
   listEntriesForEmployee,
   listAlertsForEmployee,
+  getFrequencyLabel,
   getProcessWithFields,
   createEntry,
   getEntryWithDetails,
@@ -14,8 +15,8 @@ const {
 
 const router = express.Router();
 
-async function listEmployeeProcesses(userId) {
-  return db.all(
+async function listEmployeeProcesses(userId, locale = "pl") {
+  const rows = await db.all(
     `
     SELECT
       p.id,
@@ -36,6 +37,15 @@ async function listEmployeeProcesses(userId) {
     `,
     [userId]
   );
+
+  return rows.map((process) => ({
+    ...process,
+    frequency_label: getFrequencyLabel(
+      process.frequency_type,
+      process.frequency_value,
+      locale
+    ),
+  }));
 }
 
 router.use(ensureAuthenticated, ensureEmployee);
@@ -62,7 +72,7 @@ router.use(async (req, _res, next) => {
 router.get("/", async (req, res, next) => {
   try {
     const [processes, entries, alerts] = await Promise.all([
-      listEmployeeProcesses(req.user.id),
+      listEmployeeProcesses(req.user.id, req.locale),
       listEntriesForEmployee(req.user.id),
       listAlertsForEmployee(req.user.id),
     ]);
@@ -111,6 +121,7 @@ router.get("/processes/:processId/new-entry", async (req, res, next) => {
       errors: [],
       previousValues: {},
       correctiveAction: "",
+      recordedForAt: "",
     });
   } catch (error) {
     return next(error);
@@ -160,6 +171,7 @@ router.post("/processes/:processId/entries", async (req, res, next) => {
         errors: result.errors || ["Nie udalo sie zapisac wpisu."],
         previousValues: req.body,
         correctiveAction: String(req.body.correctiveAction || ""),
+        recordedForAt: String(req.body.recordedForAt || ""),
       });
     }
 
