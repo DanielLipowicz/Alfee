@@ -198,6 +198,7 @@ function resolvePdfFontPath() {
     path.join(process.cwd(), "assets", "fonts", "DejaVuSans.ttf"),
     "C:\\Windows\\Fonts\\arial.ttf",
     "C:\\Windows\\Fonts\\segoeui.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
   ];
@@ -223,7 +224,7 @@ function getPdfColumnDefinitions(group) {
     { key: "created_at", label: "Data", weight: 1.4, align: "left" },
     { key: "recorded_for_at", label: "Dotyczy godz.", weight: 1.4, align: "left" },
     { key: "review", label: "Review", weight: 1.1, align: "left" },
-    { key: "corrective_action_text", label: "DziaÅ‚ania korygujÄ…ce", weight: 2.6, align: "left" },
+    { key: "corrective_action_text", label: "Działania korygujące", weight: 2.6, align: "left" },
     ...group.fields.map((field) => ({
       key: `field_${field.id}`,
       label: field.name,
@@ -279,6 +280,9 @@ async function buildPdfReport(reportGroups = [], filters = {}) {
     if (regularFontPath) {
       doc.font(regularFontPath);
     } else {
+      console.warn(
+        "HACCP PDF: nie znaleziono fontu Unicode, fallback do Helvetica moze gubic polskie znaki."
+      );
       doc.font("Helvetica");
     }
 
@@ -394,10 +398,10 @@ async function buildPdfReport(reportGroups = [], filters = {}) {
     if (filters.processId) {
       writeLine(`Proces (ID): ${filters.processId}`, { fontSize: 10, spacingAfter: 2 });
     }
-    writeLine(`Liczba wpisÃ³w: ${totalRows}`, { fontSize: 10, spacingAfter: 8 });
+    writeLine(`Liczba wpisów: ${totalRows}`, { fontSize: 10, spacingAfter: 8 });
 
     if (!Array.isArray(reportGroups) || reportGroups.length === 0) {
-      writeLine("Brak danych dla podanych filtrÃ³w.", { fontSize: 11, spacingAfter: 0 });
+      writeLine("Brak danych dla podanych filtrów.", { fontSize: 11, spacingAfter: 0 });
       doc.end();
       return;
     }
@@ -438,3 +442,4 @@ module.exports = {
   buildCsvReport,
   buildPdfReport,
 };
+

@@ -37,6 +37,10 @@ const SQLiteStore = SQLiteStoreFactory(session);
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
+const stylesPath = path.join(__dirname, "public", "css", "styles.css");
+const ASSET_VERSION =
+  process.env.ASSET_VERSION ||
+  (fs.existsSync(stylesPath) ? String(fs.statSync(stylesPath).mtimeMs) : "1");
 
 function parseBooleanEnv(value) {
   if (value == null || value === "") {
@@ -279,6 +283,7 @@ app.use((req, res, next) => {
   req.t = (sourceText) => translate(locale, sourceText);
   res.locals.locale = locale;
   res.locals.t = req.t;
+  res.locals.assetVersion = ASSET_VERSION;
   res.locals.localeOptions = SUPPORTED_LOCALES.map((code) => ({
     code,
     label: LOCALE_LABELS[code] || code.toUpperCase(),
