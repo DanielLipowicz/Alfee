@@ -303,6 +303,13 @@ function getPdfCellValue(row, column) {
 
 async function buildPdfReport(reportGroups = [], filters = {}) {
   const PDFDocument = getPdfDocumentConstructor();
+  const regularFontPath = resolvePdfFontPath();
+  if (!regularFontPath) {
+    throw new Error(
+      "HACCP PDF: nie znaleziono fontu Unicode. Ustaw HACCP_PDF_FONT_PATH lub zainstaluj NotoSans/DejaVuSans."
+    );
+  }
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: "A4",
@@ -325,16 +332,8 @@ async function buildPdfReport(reportGroups = [], filters = {}) {
       reject(error);
     });
 
-    const regularFontPath = resolvePdfFontPath();
-    if (regularFontPath) {
-      console.info(`HACCP PDF: uzywany font: ${regularFontPath}`);
-      doc.font(regularFontPath);
-    } else {
-      console.warn(
-        "HACCP PDF: nie znaleziono fontu Unicode, fallback do Helvetica moze gubic polskie znaki."
-      );
-      doc.font("Helvetica");
-    }
+    console.info(`HACCP PDF: uzywany font: ${regularFontPath}`);
+    doc.font(regularFontPath);
 
     const left = doc.page.margins.left;
     const right = doc.page.margins.right;
@@ -347,16 +346,12 @@ async function buildPdfReport(reportGroups = [], filters = {}) {
 
     const setFontSize = (size) => {
       doc.fontSize(size);
-      if (regularFontPath) {
-        doc.font(regularFontPath);
-      }
+      doc.font(regularFontPath);
     };
 
     const addPage = () => {
       doc.addPage();
-      if (regularFontPath) {
-        doc.font(regularFontPath);
-      }
+      doc.font(regularFontPath);
       cursorY = top;
     };
 
