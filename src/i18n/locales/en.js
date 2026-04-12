@@ -193,7 +193,23 @@ module.exports = {
     "Password changed.": "Password changed.",
     "Full name updated.": "Full name updated.",
     "Alert marked as resolved.": "Alert marked as resolved.",
-    "Entry has been approved.": "Entry has been approved."
+    "Entry has been approved.": "Entry has been approved.",
+    "Organization setup": "Organization setup",
+    "Choose how you want to continue in Alfee.": "Choose how you want to continue in Alfee.",
+    "Select option": "Select option",
+    "I am creating a new organization": "I am creating a new organization",
+    "Create organization and get manager access.": "Create organization and get manager access.",
+    "I want to join an existing organization as employee": "I want to join an existing organization as employee",
+    "You will need your manager to add your account.": "You will need your manager to add your account.",
+    "Continue": "Continue",
+    "Employee onboarding info": "Employee onboarding info",
+    "Contact your manager and provide this login email address.": "Contact your manager and provide this login email address.",
+    "Select how you want to continue.": "Select how you want to continue.",
+    "Enter organization name.": "Enter organization name.",
+    "Organization name can have up to 120 characters.": "Organization name can have up to 120 characters.",
+    "This organization name is already in use.": "This organization name is already in use.",
+    "Please contact your manager and provide your email address.": "Please contact your manager and provide your email address.",
+    "Organization created. You are now a manager.": "Organization created. You are now a manager."
   },
   dynamic: [
     { pattern: /^Konto jest czasowo zablokowane po wielu nieudanych probach\. Sprobuj ponownie za (\d+) minut\.$/u, replace: (minutes) =>

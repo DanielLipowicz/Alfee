@@ -1,0 +1,68 @@
+<%- include("partials/top", { title }) %>
+
+<section class="card narrow">
+  <h1><%= t("Organization setup") %></h1>
+  <p><%= t("Choose how you want to continue in Alfee.") %></p>
+
+  <form class="form-stack" method="POST" action="/onboarding/organization">
+    <fieldset class="onboarding-options">
+      <legend><%= t("Select option") %></legend>
+
+      <label class="onboarding-option">
+        <span class="onboarding-option__head">
+          <input
+            type="radio"
+            name="organizationChoice"
+            value="create"
+            <%= formData?.organizationChoice === "create" ? "checked" : "" %>
+          />
+          <strong><%= t("I am creating a new organization") %></strong>
+        </span>
+        <span class="muted">
+          <%= t("Create organization and get manager access.") %>
+        </span>
+      </label>
+
+      <label>
+        <%= t("Organization name") %>
+        <input
+          type="text"
+          name="organizationName"
+          value="<%= formData?.organizationName || '' %>"
+          maxlength="120"
+          autocomplete="organization"
+        />
+      </label>
+
+      <label class="onboarding-option">
+        <span class="onboarding-option__head">
+          <input
+            type="radio"
+            name="organizationChoice"
+            value="join"
+            <%= formData?.organizationChoice === "join" ? "checked" : "" %>
+          />
+          <strong><%= t("I want to join an existing organization as employee") %></strong>
+        </span>
+        <span class="muted">
+          <%= t("You will need your manager to add your account.") %>
+        </span>
+      </label>
+    </fieldset>
+
+    <button class="btn btn--primary" type="submit"><%= t("Continue") %></button>
+  </form>
+</section>
+
+<% if (showEmployeeInfo) { %>
+<section class="card narrow onboarding-info">
+  <h2><%= t("Employee onboarding info") %></h2>
+  <p><%= t("Contact your manager and provide this login email address.") %></p>
+  <p>
+    <strong><%= t("Login email:") %></strong>
+    <code><%= currentUser?.email || "" %></code>
+  </p>
+</section>
+<% } %>
+
+<%- include("partials/bottom") %>

@@ -37,6 +37,11 @@ const SQLiteStore = SQLiteStoreFactory(session);
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
+const ORGANIZATION_ONBOARDING_ROLES = new Set([
+  "manager",
+  "employee",
+  "observer",
+]);
 const stylesPath = path.join(__dirname, "public", "css", "styles.css");
 const ASSET_VERSION =
   process.env.ASSET_VERSION ||
@@ -164,21 +169,10 @@ function renderAuthError(res, statusCode, viewName, formData, message) {
 }
 
 async function determineRoleForNewUser(email) {
-  const managerCount = await db.get(
-    "SELECT COUNT(*) AS total FROM users WHERE role = 'manager'"
-  );
-
   if (adminEmails.includes(email)) {
     return "admin";
   }
   if (managerEmails.includes(email)) {
-    return "manager";
-  }
-  if (
-    Number(managerCount.total || 0) === 0 &&
-    managerEmails.length === 0 &&
-    adminEmails.length === 0
-  ) {
     return "manager";
   }
   return "employee";
@@ -224,23 +218,64 @@ function isLocked(lockedUntil) {
   return lockTimestamp > Date.now();
 }
 
-async function ensureDefaultMembership(userId, role) {
-  if (role !== "manager" && role !== "employee" && role !== "observer") {
-    return;
-  }
+function requiresOrganizationOnboarding(role) {
+  return ORGANIZATION_ONBOARDING_ROLES.has(role);
+}
 
-  const organizations = await db.all("SELECT id FROM organizations ORDER BY id ASC");
-  if (organizations.length !== 1) {
-    return;
-  }
-
-  await db.run(
+async function hasOrganizationMembership(userId) {
+  const membership = await db.get(
     `
-    INSERT OR IGNORE INTO user_organizations (user_id, organization_id)
-    VALUES (?, ?)
+    SELECT 1 AS present
+    FROM user_organizations
+    WHERE user_id = ?
+    LIMIT 1
     `,
-    [userId, organizations[0].id]
+    [userId]
   );
+  return Boolean(membership);
+}
+
+function shouldShowOrganizationOnboarding(req) {
+  if (!req.user || !requiresOrganizationOnboarding(req.user.role)) {
+    return false;
+  }
+  if (!Array.isArray(req.userOrganizations)) {
+    return false;
+  }
+  return req.userOrganizations.length === 0;
+}
+
+async function redirectAfterSuccessfulAuthentication(req, res, next) {
+  try {
+    if (await hasOrganizationMembership(req.user.id)) {
+      return redirectByRole(req, res);
+    }
+    if (requiresOrganizationOnboarding(req.user.role)) {
+      return res.redirect("/onboarding/organization");
+    }
+    return redirectByRole(req, res);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+function renderOrganizationOnboarding(
+  res,
+  statusCode,
+  { formData, showEmployeeInfo = false, message = null } = {}
+) {
+  if (message) {
+    res.locals.flash = { type: "error", text: message };
+  }
+
+  return res.status(statusCode).render("organization-onboarding", {
+    title: "Organization setup",
+    formData: {
+      organizationChoice: String(formData?.organizationChoice || ""),
+      organizationName: String(formData?.organizationName || ""),
+    },
+    showEmployeeInfo,
+  });
 }
 
 app.set("view engine", "ejs");
@@ -407,8 +442,6 @@ if (googleConfigured) {
             });
           }
 
-          await ensureDefaultMembership(user.id, user.role);
-
           done(null, user);
         } catch (error) {
           done(error);
@@ -445,7 +478,23 @@ app.use(async (req, res, next) => {
 
 app.use(loadUserOrganizations);
 
+app.use((req, res, next) => {
+  if (!shouldShowOrganizationOnboarding(req)) {
+    return next();
+  }
+
+  if (req.path === "/onboarding/organization" || req.path === "/logout") {
+    return next();
+  }
+
+  return res.redirect("/onboarding/organization");
+});
+
 function redirectByRole(req, res) {
+  if (shouldShowOrganizationOnboarding(req)) {
+    return res.redirect("/onboarding/organization");
+  }
+
   if (req.user.role === "admin") {
     if (req.isAdminManagerMode === true) {
       return res.redirect("/manager/dashboard");
@@ -460,6 +509,154 @@ function redirectByRole(req, res) {
   }
   return res.redirect("/employee/tasks");
 }
+
+app.get("/onboarding/organization", ensureAuthenticated, (req, res) => {
+  if (!requiresOrganizationOnboarding(req.user.role)) {
+    return redirectByRole(req, res);
+  }
+
+  if (!shouldShowOrganizationOnboarding(req)) {
+    return redirectByRole(req, res);
+  }
+
+  const mode = String(req.query.mode || "").trim().toLowerCase();
+  const showEmployeeInfo = mode === "join";
+
+  return renderOrganizationOnboarding(res, 200, {
+    formData: {
+      organizationChoice: showEmployeeInfo ? "join" : "",
+      organizationName: "",
+    },
+    showEmployeeInfo,
+  });
+});
+
+app.post("/onboarding/organization", ensureAuthenticated, async (req, res, next) => {
+  try {
+    if (!requiresOrganizationOnboarding(req.user.role)) {
+      return redirectByRole(req, res);
+    }
+
+    if (!shouldShowOrganizationOnboarding(req)) {
+      return redirectByRole(req, res);
+    }
+
+    const organizationChoice = String(req.body.organizationChoice || "")
+      .trim()
+      .toLowerCase();
+    const organizationName = String(req.body.organizationName || "").trim();
+    const formData = { organizationChoice, organizationName };
+
+    if (organizationChoice !== "create" && organizationChoice !== "join") {
+      return renderOrganizationOnboarding(res, 400, {
+        formData,
+        message: "Select how you want to continue.",
+      });
+    }
+
+    if (organizationChoice === "join") {
+      await db.run(
+        "UPDATE users SET role = 'employee' WHERE id = ? AND role IN ('manager', 'employee', 'observer')",
+        [req.user.id]
+      );
+
+      const refreshedUser = await db.get("SELECT * FROM users WHERE id = ?", [
+        req.user.id,
+      ]);
+
+      return req.login(refreshedUser, (error) => {
+        if (error) {
+          return next(error);
+        }
+
+        setFlash(req, "success", "Please contact your manager and provide your email address.");
+        return res.redirect("/onboarding/organization?mode=join");
+      });
+    }
+
+    if (!organizationName) {
+      return renderOrganizationOnboarding(res, 400, {
+        formData,
+        message: "Enter organization name.",
+      });
+    }
+
+    if (organizationName.length > 120) {
+      return renderOrganizationOnboarding(res, 400, {
+        formData,
+        message: "Organization name can have up to 120 characters.",
+      });
+    }
+
+    const existingOrganization = await db.get(
+      "SELECT id FROM organizations WHERE lower(name) = lower(?)",
+      [organizationName]
+    );
+
+    if (existingOrganization) {
+      return renderOrganizationOnboarding(res, 409, {
+        formData,
+        message: "This organization name is already in use.",
+      });
+    }
+
+    let createdOrganizationId = null;
+    await db.run("BEGIN IMMEDIATE TRANSACTION");
+    try {
+      const createdOrganization = await db.run(
+        "INSERT INTO organizations (name) VALUES (?)",
+        [organizationName]
+      );
+      createdOrganizationId = Number(createdOrganization.lastID);
+
+      await db.run(
+        `
+        INSERT OR IGNORE INTO user_organizations (user_id, organization_id)
+        VALUES (?, ?)
+        `,
+        [req.user.id, createdOrganizationId]
+      );
+
+      await db.run(
+        "UPDATE users SET role = 'manager' WHERE id = ? AND role IN ('manager', 'employee', 'observer')",
+        [req.user.id]
+      );
+
+      await db.run("COMMIT");
+    } catch (transactionError) {
+      await db.run("ROLLBACK");
+      throw transactionError;
+    }
+
+    const refreshedUser = await db.get("SELECT * FROM users WHERE id = ?", [
+      req.user.id,
+    ]);
+
+    if (req.session) {
+      req.session.activeOrganizationId = createdOrganizationId;
+    }
+
+    return req.login(refreshedUser, (error) => {
+      if (error) {
+        return next(error);
+      }
+
+      setFlash(req, "success", "Organization created. You are now a manager.");
+      return res.redirect("/manager/dashboard");
+    });
+  } catch (error) {
+    if (error?.code === "SQLITE_CONSTRAINT") {
+      return renderOrganizationOnboarding(res, 409, {
+        formData: {
+          organizationChoice: "create",
+          organizationName: String(req.body.organizationName || "").trim(),
+        },
+        message: "This organization name is already in use.",
+      });
+    }
+    return next(error);
+  }
+});
 
 app.get("/", (req, res) => {
   if (req.isAuthenticated()) {
@@ -588,7 +785,7 @@ app.post("/login/local", async (req, res, next) => {
         return next(error);
       }
       setFlash(req, "success", "Zalogowano pomyslnie.");
-      return redirectByRole(req, res);
+      return redirectAfterSuccessfulAuthentication(req, res, next);
     });
   } catch (error) {
     return next(error);
@@ -696,14 +893,13 @@ app.post("/register", async (req, res, next) => {
     );
 
     const user = await db.get("SELECT * FROM users WHERE id = ?", [created.lastID]);
-    await ensureDefaultMembership(user.id, user.role);
 
     return req.login(user, (error) => {
       if (error) {
         return next(error);
       }
       setFlash(req, "success", "Konto utworzone i aktywne. Zalogowano.");
-      return redirectByRole(req, res);
+      return redirectAfterSuccessfulAuthentication(req, res, next);
     });
   } catch (error) {
     return next(error);
@@ -735,9 +931,9 @@ app.get(
     return next();
   },
   passport.authenticate("google", { failureRedirect: "/login" }),
-  (req, res) => {
+  (req, res, next) => {
     setFlash(req, "success", "Zalogowano pomyslnie.");
-    return redirectByRole(req, res);
+    return redirectAfterSuccessfulAuthentication(req, res, next);
   }
 );
 

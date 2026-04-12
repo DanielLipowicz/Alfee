@@ -355,6 +355,37 @@ th {
   gap: 0.9rem;
 }
 
+.onboarding-options {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem;
+  margin: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.onboarding-options legend {
+  padding: 0 0.4rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.onboarding-option {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem;
+}
+
+.onboarding-option__head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.onboarding-info p {
+  margin: 0;
+}
+
 .form-inline {
   display: flex;
   align-items: center;
