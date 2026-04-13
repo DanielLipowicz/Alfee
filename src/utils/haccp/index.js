@@ -30,6 +30,10 @@ const {
   resolveAlert,
 } = require("./alerts");
 const { listReportRows, buildCsvReport, buildPdfReport } = require("./reporting");
+const {
+  DEFAULT_HACCP_PROCESSES,
+  seedDefaultHaccpProcessesForOrganization,
+} = require("./onboarding");
 
 module.exports = {
   FIELD_TYPES,
@@ -60,4 +64,6 @@ module.exports = {
   buildCsvReport,
   buildPdfReport,
   getManagerDashboardStats,
+  DEFAULT_HACCP_PROCESSES,
+  seedDefaultHaccpProcessesForOrganization,
 };

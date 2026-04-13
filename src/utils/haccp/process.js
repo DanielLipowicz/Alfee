@@ -794,9 +794,33 @@ function normalizeEntryPayload(processDefinition, body) {
     }
 
     if (field.type === "BOOLEAN") {
+      const booleanNumberValue = parseBoolean(textValue) ? 1 : 0;
+      const minValue = parseDecimal(field.min_value);
+      const maxValue = parseDecimal(field.max_value);
+      const level = classifyDeviation({
+        value: booleanNumberValue,
+        minValue,
+        maxValue,
+        isCcp: Number(processDefinition.is_ccp) === 1,
+      });
+      if (level) {
+        const bounds = [];
+        if (minValue != null) {
+          bounds.push(`min ${minValue}`);
+        }
+        if (maxValue != null) {
+          bounds.push(`max ${maxValue}`);
+        }
+        deviations.push({
+          fieldName: field.name,
+          level,
+          message: `Pole "${field.name}" (${booleanNumberValue}) poza zakresem ${bounds.join(", ")}.`,
+        });
+      }
+
       values.push({
         fieldId: field.id,
-        value: parseBoolean(textValue) ? "1" : "0",
+        value: String(booleanNumberValue),
       });
       continue;
     }

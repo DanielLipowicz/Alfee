@@ -19,8 +19,13 @@ const notificationRoutes = require("./src/routes/notificationRoutes");
 const profileRoutes = require("./src/routes/profileRoutes");
 const { ensureAuthenticated } = require("./src/middleware/auth");
 const { loadUserOrganizations } = require("./src/middleware/tenant");
+const { requestLogger } = require("./src/middleware/requestLogger");
 const { hashPassword, verifyPassword } = require("./src/security/password");
 const { setFlash } = require("./src/utils/flash");
+const logger = require("./src/utils/logger");
+const {
+  seedDefaultHaccpProcessesForOrganization,
+} = require("./src/utils/haccp");
 const {
   SUPPORTED_LOCALES,
   DEFAULT_LOCALE,
@@ -46,6 +51,19 @@ const stylesPath = path.join(__dirname, "public", "css", "styles.css");
 const ASSET_VERSION =
   process.env.ASSET_VERSION ||
   (fs.existsSync(stylesPath) ? String(fs.statSync(stylesPath).mtimeMs) : "1");
+
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled promise rejection", {
+    reason: reason instanceof Error ? logger.serializeError(reason) : reason,
+  });
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught exception", {
+    error: logger.serializeError(error),
+  });
+  process.exit(1);
+});
 
 function parseBooleanEnv(value) {
   if (value == null || value === "") {
@@ -356,6 +374,7 @@ app.use((req, res, next) => {
 
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(requestLogger);
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -621,6 +640,11 @@ app.post("/onboarding/organization", ensureAuthenticated, async (req, res, next)
         "UPDATE users SET role = 'manager' WHERE id = ? AND role IN ('manager', 'employee', 'observer')",
         [req.user.id]
       );
+
+      await seedDefaultHaccpProcessesForOrganization({
+        organizationId: createdOrganizationId,
+        createdBy: Number(req.user.id),
+      });
 
       await db.run("COMMIT");
     } catch (transactionError) {
@@ -966,7 +990,12 @@ app.use((req, res) => {
 });
 
 app.use((error, req, res, _next) => {
-  console.error(error);
+  logger.error("Unhandled application error", {
+    requestId: req.requestId || null,
+    method: req.method,
+    path: req.path,
+    error: logger.serializeError(error),
+  });
   if (!res.headersSent) {
     res.status(500).render("error", {
       title: "Blad serwera",
@@ -979,11 +1008,20 @@ app.use((error, req, res, _next) => {
 async function start() {
   await initDatabase();
   app.listen(PORT, () => {
-    console.log(`Aplikacja dziala na http://localhost:${PORT}`);
+    logger.info("Application started", {
+      port: PORT,
+      url: `http://localhost:${PORT}`,
+      logDirectory: logger.constants.LOG_DIRECTORY,
+      allLogsFile: logger.constants.ALL_LOG_FILE,
+      errorLogsFile: logger.constants.ERROR_LOG_FILE,
+      maxLogSizeBytes: logger.constants.MAX_LOG_SIZE_BYTES,
+    });
   });
 }
 
 start().catch((error) => {
-  console.error("Nie udalo sie uruchomic aplikacji:", error);
+  logger.error("Failed to start application", {
+    error: logger.serializeError(error),
+  });
   process.exit(1);
 });

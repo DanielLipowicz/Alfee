@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const { db } = require("../../database");
+const logger = require("../logger");
 const { parseBoolean, normalizeText, escapeCsv } = require("./shared");
 const { listEntriesForManager } = require("./process");
 
@@ -332,7 +333,9 @@ async function buildPdfReport(reportGroups = [], filters = {}) {
       reject(error);
     });
 
-    console.info(`HACCP PDF: uzywany font: ${regularFontPath}`);
+    logger.info("HACCP PDF font selected", {
+      fontPath: regularFontPath,
+    });
     doc.font(regularFontPath);
 
     const left = doc.page.margins.left;

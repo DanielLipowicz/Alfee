@@ -3,6 +3,9 @@ const express = require("express");
 const { db } = require("../database");
 const { ensureAuthenticated, ensureAdmin } = require("../middleware/auth");
 const { setFlash } = require("../utils/flash");
+const {
+  seedDefaultHaccpProcessesForOrganization,
+} = require("../utils/haccp");
 
 const router = express.Router();
 
@@ -333,10 +336,20 @@ router.post("/organizations", async (req, res, next) => {
   }
 
   try {
-    await db.run("INSERT INTO organizations (name) VALUES (?)", [name]);
+    await db.run("BEGIN TRANSACTION");
+    const createdOrganization = await db.run(
+      "INSERT INTO organizations (name) VALUES (?)",
+      [name]
+    );
+    await seedDefaultHaccpProcessesForOrganization({
+      organizationId: createdOrganization.lastID,
+      createdBy: Number(req.user.id),
+    });
+    await db.run("COMMIT");
     setFlash(req, "success", "Utworzono organizacje.");
     return res.redirect("/admin/organizations");
   } catch (error) {
+    await rollbackSafely();
     if (error.message?.includes("UNIQUE")) {
       setFlash(req, "error", "Organizacja o tej nazwie juz istnieje.");
       return res.redirect("/admin/organizations");
